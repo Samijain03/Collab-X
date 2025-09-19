@@ -1,0 +1,29 @@
+{% extends 'chatapp/base.html' %}
+
+{% block title %}{{ title }} | Collab-X{% endblock %}
+
+{% block content %}
+<div class="p-5 mb-4 bg-light rounded-3 text-center">
+    <div class="container-fluid py-5">
+        <h1 class="display-5 fw-bold">Welcome to Collab-X 🤝</h1>
+        <p class="fs-4">The best place to connect and collaborate. Join the conversation today!</p>
+        <a class="btn btn-primary btn-lg" href="{% url 'chatapp:signup' %}" role="button">Get Started</a>
+        <a class="btn btn-secondary btn-lg" href="{% url 'chatapp:login' %}" role="button">Login</a>
+    </div>
+</div>
+
+<div class="row align-items-md-stretch">
+    <div class="col-md-6 mb-3">
+        <div class="h-100 p-5 text-white bg-dark rounded-3">
+            <h2>Real-time Messaging</h2>
+            <p>Experience seamless, real-time messaging with instant notifications. Never miss an important update.</p>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="h-100 p-5 bg-light border rounded-3">
+            <h2>Secure & Private</h2>
+            <p>Your conversations are important. We prioritize your security and privacy with end-to-end best practices.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

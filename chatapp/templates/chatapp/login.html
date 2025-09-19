@@ -1,0 +1,49 @@
+{% extends 'chatapp/base.html' %}
+{% load socialaccount %}
+
+{% block title %}Log In | Collab-X{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-center">
+    <div class="col-md-8 col-lg-6 col-xl-5">
+        <div class="card shadow-lg border-0 rounded-4">
+            <div class="card-body p-4 p-md-5">
+                <h2 class="card-title text-center fw-bold mb-4">Log In to Collab-X</h2>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger" role="alert">
+                            {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% for field in form %}
+                        <div class="form-floating mb-3">
+                            {{ field }}
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% for error in field.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-dark btn-lg">Log In</button>
+                    </div>
+                </form>
+
+                <div class="text-center mt-4">
+                    <small class="text-muted">
+                        Don't have an account? 
+                        <a href="{% url 'chatapp:signup' %}" class="fw-bold">Sign Up</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

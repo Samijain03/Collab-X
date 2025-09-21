@@ -34,6 +34,8 @@ INSTALLED_APPS = [
     'chatapp',
     'django.contrib.sites', 
     'allauth',
+    'crispy_forms',
+    'crispy_bootstrap5',
     'allauth.account',
     'allauth.socialaccount',
     'django.contrib.admin',
@@ -138,6 +140,9 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-ACCOUNT_EMAIL_VERIFICATION = "optional" # Or "mandatory"
+ACCOUNT_EMAIL_VERIFICATION = "optional"
 ACCOUNT_EMAIL_REQUIRED = True
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/dashboard/'
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"

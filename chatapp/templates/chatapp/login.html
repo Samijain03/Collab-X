@@ -1,7 +1,5 @@
 {% extends 'chatapp/base.html' %}
-{% load socialaccount %}
-
-{% block title %}Log In | Collab-X{% endblock %}
+{% load crispy_forms_tags %}  {% block title %}Log In | Collab-X{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-center">
@@ -13,23 +11,7 @@
                 <form method="post" novalidate>
                     {% csrf_token %}
 
-                    {% if form.non_field_errors %}
-                        <div class="alert alert-danger" role="alert">
-                            {% for error in form.non_field_errors %}
-                                <p class="mb-0">{{ error }}</p>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-
-                    {% for field in form %}
-                        <div class="form-floating mb-3">
-                            {{ field }}
-                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                            {% for error in field.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                    {% endfor %}
+                    {{ form|crispy }}
 
                     <div class="d-grid mt-4">
                         <button type="submit" class="btn btn-dark btn-lg">Log In</button>

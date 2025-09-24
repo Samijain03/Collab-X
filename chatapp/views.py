@@ -4,6 +4,8 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from .forms import SignUpForm
 from django.contrib.auth.models import User
+from django.db.models import Q
+from django.contrib import messages
 
 # Homepage View
 def home(request):
@@ -61,8 +63,37 @@ def logout_view(request):
 
 @login_required
 def dashboard_view(request):
-    contacts = User.objects.exclude(username=request.user.username)
+    # Get the profile of the current user to access their contacts
+    profile = request.user.profile
+    contacts = profile.contacts.all()
+    
     context = {
-        'contacts': contacts
+        'contacts': contacts,
     }
     return render(request, 'chatapp/dashboard.html', context)
+
+@login_required
+def search_users_view(request):
+    query = request.GET.get('q')
+    results = []
+    if query:
+        # Search for users by username, excluding the current user
+        results = User.objects.filter(
+            Q(username__icontains=query)
+        ).exclude(username=request.user.username)
+    
+    context = {
+        'results': results,
+    }
+    return render(request, 'chatapp/search_results.html', context)
+
+@login_required
+def add_contact_view(request, user_id):
+    try:
+        contact_to_add = User.objects.get(id=user_id)
+        request.user.profile.contacts.add(contact_to_add.profile)
+        messages.success(request, f'{contact_to_add.username} has been added to your contacts!')
+    except User.DoesNotExist:
+        messages.error(request, 'User not found.')
+    
+    return redirect('chatapp:dashboard')

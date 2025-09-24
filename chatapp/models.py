@@ -5,7 +5,7 @@ from django.dispatch import receiver
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    # You can add more fields here later, like a profile picture or status
+    contacts = models.ManyToManyField('self', related_name='contact_of', symmetrical=False, blank=True)
     
     def __str__(self):
         return self.user.username

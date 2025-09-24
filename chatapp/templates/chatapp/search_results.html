@@ -1,0 +1,28 @@
+{% extends 'chatapp/base.html' %}
+{% block title %}Search Users | Collab-X{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Find Users</h2>
+    <form method="GET" action="{% url 'chatapp:search_users' %}">
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" placeholder="Search by username..." name="q" value="{{ request.GET.q }}">
+            <button class="btn btn-primary" type="submit">Search</button>
+        </div>
+    </form>
+
+    {% if results %}
+        <h4 class="mt-4">Results:</h4>
+        <ul class="list-group">
+            {% for user in results %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ user.username }}
+                    <a href="{% url 'chatapp:add_contact' user.id %}" class="btn btn-sm btn-success">Add Contact</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% elif request.GET.q %}
+        <p>No users found matching your search.</p>
+    {% endif %}
+</div>
+{% endblock %}

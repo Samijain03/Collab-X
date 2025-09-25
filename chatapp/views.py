@@ -6,6 +6,7 @@ from .forms import SignUpForm
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.contrib import messages
+from .forms import SignUpForm, ProfileUpdateForm # Add ProfileUpdateForm to imports by kk
 
 # Homepage View
 def home(request):
@@ -97,3 +98,24 @@ def add_contact_view(request, user_id):
         messages.error(request, 'User not found.')
     
     return redirect('chatapp:dashboard')
+
+
+# --- Add this new view at the end of the file by kk ---
+@login_required
+def settings_view(request):
+    if request.method == 'POST':
+        # Pass request.POST for form data and request.FILES for uploaded files
+        form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user.profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Your profile has been updated successfully!')
+            return redirect('chatapp:settings') # Redirect back to the settings page
+    else:
+        # For a GET request, create a form instance with the user's current profile data
+        form = ProfileUpdateForm(instance=request.user.profile)
+
+    context = {
+        'form': form,
+        'title': 'Account Settings'
+    }
+    return render(request, 'chatapp/settings.html', context)

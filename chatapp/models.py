@@ -7,6 +7,11 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     contacts = models.ManyToManyField('self', related_name='contact_of', symmetrical=False, blank=True)
     
+ # --- add by kk ---
+    display_name = models.CharField(max_length=50, blank=True, null=True)
+    about_me = models.TextField(max_length=200, blank=True)
+    profile_picture = models.ImageField(default='profile_pics/default.jpg', upload_to='profile_pics')
+
     def __str__(self):
         return self.user.username
 
@@ -15,6 +20,11 @@ class Profile(models.Model):
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
+
+# --- Add this signal to save the profile when the user is saved by ---
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    instance.profile.save()
 
 class Message(models.Model):
     sender = models.ForeignKey(User, related_name="sent_messages", on_delete=models.CASCADE)

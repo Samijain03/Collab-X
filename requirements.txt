@@ -3,3 +3,4 @@ django-allauth
 PyJWT
 django-crispy-forms
 crispy-bootstrap5
+pillow

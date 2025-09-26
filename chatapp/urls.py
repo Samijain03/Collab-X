@@ -11,6 +11,8 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('search/', views.search_users_view, name='search_users'),
-    path('add-contact/<int:user_id>/', views.add_contact_view, name='add_contact'),
+    path('send-request/<int:user_id>/', views.send_contact_request_view, name='send_contact_request'),
+    path('accept-request/<int:request_id>/', views.accept_contact_request_view, name='accept_contact_request'),
+    path('decline-request/<int:request_id>/', views.decline_contact_request_view, name='decline_contact_request'),
     path('settings/', views.settings_view, name='settings'),
 ]

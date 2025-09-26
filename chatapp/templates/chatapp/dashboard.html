@@ -6,41 +6,38 @@
 <div class="container-fluid vh-100 d-flex flex-column p-0">
     <div class="row g-0 flex-grow-1">
         <div class="col-md-4 col-lg-3 d-none d-md-flex flex-column bg-light border-end sidebar">
-    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-        <h5 class="fw-bold mb-0">Contacts</h5>
-        <a href="{% url 'chatapp:search_users' %}" class="btn btn-sm btn-primary">+ Add</a>
-    </div>
-    <div class="list-group list-group-flush overflow-auto">
-        {% for contact_profile in contacts %}
-            <a href="#" class="list-group-item list-group-item-action">
-                <h6 class="mb-1">{{ contact_profile.user.username }}</h6>
-            </a>
-        {% empty %}
-            <p class="p-3 text-muted">Your contact list is empty. Find users to start chatting!</p>
-        {% endfor %}
-    </div>
-</div>
+            {% if incoming_requests %}
+                <div class="p-3 border-bottom">
+                    <h5 class="fw-bold mb-2">Contact Requests</h5>
+                    {% for request in incoming_requests %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>{{ request.from_user.username }}</span>
+                            <div>
+                                <a href="{% url 'chatapp:accept_contact_request' request.id %}" class="btn btn-sm btn-success">Accept</a>
+                                <a href="{% url 'chatapp:decline_contact_request' request.id %}" class="btn btn-sm btn-danger">Decline</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Contacts</h5>
+                <a href="{% url 'chatapp:search_users' %}" class="btn btn-sm btn-primary">+ Add</a>
+            </div>
+            <div class="list-group list-group-flush overflow-auto">
+                {% for contact_profile in contacts %}
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <h6 class="mb-1">{{ contact_profile.user.username }}</h6>
+                    </a>
+                {% empty %}
+                    <p class="p-3 text-muted">Your contact list is empty. Find users to start chatting!</p>
+                {% endfor %}
+            </div>
+        </div>
 
         <div class="col-md-8 col-lg-9 d-flex flex-column">
-            <div class="p-3 d-flex align-items-center border-bottom">
-                <h5 class="fw-bold mb-0">Select a chat to begin</h5>
             </div>
-            <div class="flex-grow-1 p-4 d-flex align-items-center justify-content-center" style="background-color: #f8f9fa;">
-                <div class="text-center">
-                    <p class="fs-4 text-muted">Your conversations will appear here.</p>
-                </div>
-            </div>
-             <div class="p-3 bg-light border-top">
-                <form method="post" class="input-group">
-                    
-                    {% csrf_token %}
-
-                    <input type="text" class="form-control" placeholder="Type a message..." name="message_content" aria-label="Type a message">
-                    <button class="btn btn-primary" type="submit">Send</button>
-                </form>
-            </div>
-        </div>
-        </div>
     </div>
 </div>
 {% endblock %}

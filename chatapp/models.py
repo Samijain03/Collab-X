@@ -1,3 +1,4 @@
+# chatapp/models.py
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -15,18 +16,19 @@ class Profile(models.Model):
     def __str__(self):
         return self.user.username
 
-# This signal automatically creates a Profile when a new User is created
+# ... (keep the Profile signals as they are) ...
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
 
-# --- Add this signal to save the profile when the user is saved by ---
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
     instance.profile.save()
 
 class Message(models.Model):
+    # ... (keep the Message model as it is) ...
     sender = models.ForeignKey(User, related_name="sent_messages", on_delete=models.CASCADE)
     receiver = models.ForeignKey(User, related_name="received_messages", on_delete=models.CASCADE)
     content = models.TextField()
@@ -37,3 +39,17 @@ class Message(models.Model):
 
     class Meta:
         ordering = ['timestamp']
+
+# --- ADD THIS NEW MODEL ---
+class ContactRequest(models.Model):
+    """Model to represent a pending contact request."""
+    from_user = models.ForeignKey(User, related_name='sent_contact_requests', on_delete=models.CASCADE)
+    to_user = models.ForeignKey(User, related_name='received_contact_requests', on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Request from {self.from_user.username} to {self.to_user.username}"
+
+    class Meta:
+        # Ensures a user can only send one request to another user at a time
+        unique_together = ('from_user', 'to_user')

@@ -15,11 +15,13 @@
         <h4 class="mt-4">Results:</h4>
         <ul class="list-group">
             {% for user in results %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    {{ user.username }}
-                    <a href="{% url 'chatapp:add_contact' user.id %}" class="btn btn-sm btn-success">Add Contact</a>
-                </li>
-            {% endfor %}
+    <p>
+        {{ user.username }}
+        <a href="{% url 'chatapp:send_contact_request' user.id %}" class="btn btn-primary btn-sm">
+            Send Request
+        </a>
+    </p>
+{% endfor %}
         </ul>
     {% elif request.GET.q %}
         <p>No users found matching your search.</p>

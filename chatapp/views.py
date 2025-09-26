@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django.contrib import messages
 from .forms import SignUpForm, ProfileUpdateForm # Add ProfileUpdateForm to imports by kk
+from .models import ContactRequest # 👈 ADD THIS IMPORT
 
 # Homepage View
 def home(request):
@@ -64,12 +65,14 @@ def logout_view(request):
 
 @login_required
 def dashboard_view(request):
-    # Get the profile of the current user to access their contacts
     profile = request.user.profile
     contacts = profile.contacts.all()
+    # Get incoming contact requests for the logged-in user
+    incoming_requests = ContactRequest.objects.filter(to_user=request.user)
     
     context = {
         'contacts': contacts,
+        'incoming_requests': incoming_requests, # 👈 Add requests to context
     }
     return render(request, 'chatapp/dashboard.html', context)
 
@@ -89,16 +92,49 @@ def search_users_view(request):
     return render(request, 'chatapp/search_results.html', context)
 
 @login_required
-def add_contact_view(request, user_id):
+def send_contact_request_view(request, user_id):
     try:
-        contact_to_add = User.objects.get(id=user_id)
-        request.user.profile.contacts.add(contact_to_add.profile)
-        messages.success(request, f'{contact_to_add.username} has been added to your contacts!')
+        user_to_request = User.objects.get(id=user_id)
+        # Check if a request already exists or if they are already contacts
+        if request.user.profile.contacts.filter(user=user_to_request).exists():
+             messages.info(request, f'You are already contacts with {user_to_request.username}.')
+        elif ContactRequest.objects.filter(from_user=request.user, to_user=user_to_request).exists():
+            messages.info(request, 'You have already sent a request to this user.')
+        else:
+            ContactRequest.objects.create(from_user=request.user, to_user=user_to_request)
+            messages.success(request, f'Contact request sent to {user_to_request.username}!')
     except User.DoesNotExist:
         messages.error(request, 'User not found.')
     
+    return redirect('chatapp:search_users') # Redirect back to search results
+
+@login_required
+def accept_contact_request_view(request, request_id):
+    try:
+        contact_request = ContactRequest.objects.get(id=request_id, to_user=request.user)
+        
+        # Add both users to each other's contact lists
+        request.user.profile.contacts.add(contact_request.from_user.profile)
+        contact_request.from_user.profile.contacts.add(request.user.profile)
+        
+        # Delete the request object after accepting
+        contact_request.delete()
+        messages.success(request, f'You are now contacts with {contact_request.from_user.username}!')
+    except ContactRequest.DoesNotExist:
+        messages.error(request, 'Contact request not found or invalid.')
+        
     return redirect('chatapp:dashboard')
 
+@login_required
+def decline_contact_request_view(request, request_id):
+    try:
+        contact_request = ContactRequest.objects.get(id=request_id, to_user=request.user)
+        contact_request.delete()
+        messages.info(request, 'Contact request declined.')
+    except ContactRequest.DoesNotExist:
+        messages.error(request, 'Contact request not found or invalid.')
+        
+    return redirect('chatapp:dashboard')
 
 # --- Add this new view at the end of the file by kk ---
 @login_required

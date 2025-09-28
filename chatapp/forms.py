@@ -56,5 +56,5 @@ class ProfileUpdateForm(forms.ModelForm):
         widgets = {
             'display_name': forms.TextInput(attrs={'class': 'form-control'}),
             'about_me': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'profile_picture': forms.FileInput(attrs={'class': 'form-control'}),
+            'profile_picture': forms.FileInput(attrs={'style': 'display: none;', 'accept': 'image/*'}),
         }

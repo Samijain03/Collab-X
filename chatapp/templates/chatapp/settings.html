@@ -18,25 +18,37 @@
                         {% endfor %}
                     {% endif %}
                     
-                    <div class="text-center mb-4">
+                    <!-- <div class="text-center mb-4">
                         <img src="{{ user.profile.profile_picture.url }}" alt="Profile Picture" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;">
                         <h5 class="mt-2">{{ user.username }}</h5>
-                    </div>
+                    </div> -->
 
-                    <form method="POST" enctype="multipart/form-data">
+                    <form method="POST" enctype="multipart/form-data" id="profile-form">
                         {% csrf_token %}
+                        
+                        <div class="text-center mb-4">
+                            <label for="{{ form.profile_picture.id_for_label }}" class="profile-picture-container">
+                                <img id="profile-pic-preview" src="{{ user.profile.profile_picture.url }}" alt="Profile Picture" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;">
+                                <div class="profile-picture-overlay">
+                                    <i class="bi bi-camera fs-3"></i>
+                                    <p class="mb-0 small">CHANGE</p>
+                                </div>
+                            </label>
+                            <h5 class="mt-2">{{ user.username }}</h5>
+                        </div>
+
                         <div class="mb-3">
                             <label class="form-label">Display Name</label>
                             {{ form.display_name }}
                         </div>
+
                         <div class="mb-3">
                             <label class="form-label">About Me</label>
                             {{ form.about_me }}
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Change Profile Picture</label>
+
                             {{ form.profile_picture }}
-                        </div>
+
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary fw-bold">Save Changes</button>
                         </div>
@@ -46,4 +58,60 @@
         </div>
     </div>
 </div>
+
+
+<style>
+    .profile-picture-container {
+        position: relative; /* Needed for the overlay */
+        display: inline-block;
+        cursor: pointer;
+    }
+    .profile-picture-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border-radius: 50%;
+        opacity: 0; /* Hidden by default */
+        transition: opacity 0.3s ease; /* Smooth fade-in effect */
+        font-weight: bold;
+    }
+    .profile-picture-container:hover .profile-picture-overlay {
+        opacity: 1; /* Show on hover */
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const profilePicInput = document.getElementById('{{ form.profile_picture.id_for_label }}');
+        const profilePicPreview = document.getElementById('profile-pic-preview');
+        const profileForm = document.getElementById('profile-form');
+
+        // This function runs when a new file is chosen
+        profilePicInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                // Show a live preview of the new image
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    profilePicPreview.src = e.target.result;
+                }
+                reader.readAsDataURL(file);
+
+                // Automatically submit the form to save the change
+                setTimeout(() => {
+                    profileForm.submit();
+                }, 500); // Small delay to see the preview
+            }
+        });
+    });
+</script>
+
 {% endblock %}

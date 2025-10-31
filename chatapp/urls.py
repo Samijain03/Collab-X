@@ -6,7 +6,11 @@ app_name = 'chatapp'
 
 urlpatterns = [
     path('', views.home, name='home'),
-    path('dashboard/', views.dashboard_view, name='dashboard'), # Add this line
+    
+    # UPDATED: Two URLs now point to the dashboard view
+    path('dashboard/', views.dashboard_view, name='dashboard'),
+    path('dashboard/<int:contact_id>/', views.dashboard_view, name='dashboard_chat'),
+    
     path('signup/', views.signup_view, name='signup'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),

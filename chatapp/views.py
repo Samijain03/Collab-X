@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
@@ -6,17 +6,12 @@ from .forms import SignUpForm
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.contrib import messages
-from .forms import SignUpForm, ProfileUpdateForm # Add ProfileUpdateForm to imports by kk
-from .models import ContactRequest # 👈 ADD THIS IMPORT
+from .forms import SignUpForm, ProfileUpdateForm
+from .models import ContactRequest, Profile, Message # ADD Profile and Message imports
 
 # Homepage View
 def home(request):
     return render(request, 'chatapp/home.html', {'title': 'Welcome to Collab-X'})
-
-# Dashboard View
-@login_required
-def dashboard_view(request):
-    return render(request, 'chatapp/dashboard.html')
 
 # Signup View
 def signup_view(request):
@@ -50,7 +45,6 @@ def login_view(request):
             user = authenticate(username=username, password=password)
             if user is not None:
                 login(request, user)
-                # Django will now automatically redirect to LOGIN_REDIRECT_URL ('/dashboard/')
                 return redirect('chatapp:dashboard') 
     else:
         form = AuthenticationForm()
@@ -63,25 +57,53 @@ def logout_view(request):
     logout(request)
     return redirect('chatapp:home') # Redirect to homepage after logout
 
+# --- UPDATED: Dashboard View ---
 @login_required
-def dashboard_view(request):
+def dashboard_view(request, contact_id=None): # Added contact_id
     profile = request.user.profile
-    contacts = profile.contacts.all()
-    # Get incoming contact requests for the logged-in user
+    contacts_profiles = profile.contacts.all()
     incoming_requests = ContactRequest.objects.filter(to_user=request.user)
     
     context = {
-        'contacts': contacts,
-        'incoming_requests': incoming_requests, # 👈 Add requests to context
+        'contacts': contacts_profiles,
+        'incoming_requests': incoming_requests,
+        'selected_contact': None,
+        'messages': [],
     }
+
+    if contact_id:
+        try:
+            # Get the profile of the selected contact
+            selected_contact_profile = Profile.objects.get(user__id=contact_id)
+            selected_contact_user = selected_contact_profile.user
+            
+            # Security check: ensure this user is actually in the contact list
+            if selected_contact_profile in contacts_profiles:
+                context['selected_contact'] = selected_contact_profile
+                
+                # Fetch messages between the two users
+                messages_query = Message.objects.filter(
+                    (Q(sender=request.user) & Q(receiver=selected_contact_user)) |
+                    (Q(sender=selected_contact_user) & Q(receiver=request.user))
+                ).order_by('timestamp')
+                context['messages'] = messages_query
+            else:
+                messages.error(request, "This user is not in your contact list.")
+                return redirect('chatapp:dashboard')
+
+        except Profile.DoesNotExist:
+            messages.error(request, "User profile not found.")
+            return redirect('chatapp:dashboard')
+
     return render(request, 'chatapp/dashboard.html', context)
+# --- End of Updated View ---
+
 
 @login_required
 def search_users_view(request):
     query = request.GET.get('q')
     results = []
     if query:
-        # Search for users by username, excluding the current user
         results = User.objects.filter(
             Q(username__icontains=query)
         ).exclude(username=request.user.username)
@@ -95,7 +117,6 @@ def search_users_view(request):
 def send_contact_request_view(request, user_id):
     try:
         user_to_request = User.objects.get(id=user_id)
-        # Check if a request already exists or if they are already contacts
         if request.user.profile.contacts.filter(user=user_to_request).exists():
              messages.info(request, f'You are already contacts with {user_to_request.username}.')
         elif ContactRequest.objects.filter(from_user=request.user, to_user=user_to_request).exists():
@@ -106,18 +127,16 @@ def send_contact_request_view(request, user_id):
     except User.DoesNotExist:
         messages.error(request, 'User not found.')
     
-    return redirect('chatapp:search_users') # Redirect back to search results
+    return redirect('chatapp:search_users')
 
 @login_required
 def accept_contact_request_view(request, request_id):
     try:
         contact_request = ContactRequest.objects.get(id=request_id, to_user=request.user)
         
-        # Add both users to each other's contact lists
         request.user.profile.contacts.add(contact_request.from_user.profile)
         contact_request.from_user.profile.contacts.add(request.user.profile)
         
-        # Delete the request object after accepting
         contact_request.delete()
         messages.success(request, f'You are now contacts with {contact_request.from_user.username}!')
     except ContactRequest.DoesNotExist:
@@ -136,18 +155,15 @@ def decline_contact_request_view(request, request_id):
         
     return redirect('chatapp:dashboard')
 
-# --- Add this new view at the end of the file by kk ---
 @login_required
 def settings_view(request):
     if request.method == 'POST':
-        # Pass request.POST for form data and request.FILES for uploaded files
         form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user.profile)
         if form.is_valid():
             form.save()
             messages.success(request, 'Your profile has been updated successfully!')
-            return redirect('chatapp:settings') # Redirect back to the settings page
+            return redirect('chatapp:settings')
     else:
-        # For a GET request, create a form instance with the user's current profile data
         form = ProfileUpdateForm(instance=request.user.profile)
 
     context = {

@@ -1,0 +1,61 @@
+# ==========================================
+# Python and Django .gitignore
+# ==========================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv/
+
+# Django specific
+*.log
+*.pot
+*.pyc
+*.py,cover
+*.mo
+db.sqlite3
+media/
+staticfiles/
+local_settings.py
+
+# Backup and data files
+*.bak
+*.backup
+*.csv
+*.json
+*.xlsx
+*.zip
+*.tar.gz
+*.sql
+*.dump
+*.db
+data/
+backups/
+tmp/
+logs/
+
+# VSCode and editor settings
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Environment and secret files
+.env
+*.env
+
+# Node and frontend build files (if any)
+node_modules/
+dist/
+build/

@@ -6,9 +6,11 @@
 <style>
     .chat-container {
         display: flex;
-        flex-grow: 1; /* Makes the container fill the main-content block */
-        height: 0; 
-        min-height: calc(100vh - 56px); /* Full viewport height minus navbar */
+        flex-grow: 1;
+        /* Makes the container fill the main-content block */
+        height: 0;
+        min-height: calc(100vh - 56px);
+        /* Full viewport height minus navbar */
     }
 
     /* --- Sidebar (Contact List) --- */
@@ -19,16 +21,21 @@
         border-right: 1px solid #dee2e6;
         display: flex;
         flex-direction: column;
-        max-height: calc(100vh - 56px); /* Full height minus navbar */
+        max-height: calc(100vh - 56px);
+        /* Full height minus navbar */
     }
+
     .sidebar-header {
         padding: 1rem;
         border-bottom: 1px solid #dee2e6;
         background-color: #f8f9fa;
     }
+
     .contact-list {
-        overflow-y: auto; /* Makes contact list scrollable */
+        overflow-y: auto;
+        /* Makes contact list scrollable */
     }
+
     .contact-item {
         display: flex;
         align-items: center;
@@ -38,17 +45,22 @@
         color: #212529;
         transition: background-color 0.2s;
     }
+
     .contact-item:hover {
         background-color: #f8f9fa;
     }
+
     .contact-item.active {
-        background-color: #e9ecef; /* Highlight for selected chat */
+        background-color: #e9ecef;
+        /* Highlight for selected chat */
     }
+
     .contact-item img {
         width: 48px;
         height: 48px;
         object-fit: cover;
     }
+
     .contact-info {
         margin-left: 0.75rem;
         overflow: hidden;
@@ -61,9 +73,11 @@
         flex-grow: 1;
         display: flex;
         flex-direction: column;
-        background-color: #e5ddd5; /* WhatsApp-style chat background */
+        background-color: #e5ddd5;
+        /* WhatsApp-style chat background */
         max-height: calc(100vh - 56px);
     }
+
     .chat-header {
         display: flex;
         align-items: center;
@@ -71,6 +85,7 @@
         background-color: #ffffff;
         border-bottom: 1px solid #dee2e6;
     }
+
     .chat-header img {
         width: 40px;
         height: 40px;
@@ -80,29 +95,36 @@
     /* Chat Messages Area */
     .chat-messages {
         flex-grow: 1;
-        overflow-y: auto; /* Makes messages scrollable */
+        overflow-y: auto;
+        /* Makes messages scrollable */
         padding: 1rem;
         display: flex;
         flex-direction: column;
     }
+
     .message-bubble {
         max-width: 60%;
         padding: 0.5rem 0.75rem;
         border-radius: 12px;
         margin-bottom: 0.5rem;
         word-wrap: break-word;
-        box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
     }
+
     .message-bubble.sent {
-        background-color: #dcf8c6; /* Sent message color */
+        background-color: #dcf8c6;
+        /* Sent message color */
         align-self: flex-end;
         border-bottom-right-radius: 4px;
     }
+
     .message-bubble.received {
-        background-color: #ffffff; /* Received message color */
+        background-color: #ffffff;
+        /* Received message color */
         align-self: flex-start;
         border-bottom-left-radius: 4px;
     }
+
     .message-time {
         font-size: 0.75rem;
         color: #6c757d;
@@ -116,10 +138,12 @@
         background-color: #f0f0f0;
         border-top: 1px solid #dee2e6;
     }
+
     .chat-input .form-control {
         border-radius: 20px;
         border: 1px solid #dee2e6;
     }
+
     .chat-input .btn {
         border-radius: 50%;
         width: 40px;
@@ -140,22 +164,24 @@
 
 {% block content %}
 <div class="chat-container">
-    
+
     <div class="sidebar">
-        
+
         {% if incoming_requests %}
-            <div class="p-3 border-bottom bg-light">
-                <h6 class="fw-bold mb-2">Contact Requests</h6>
-                {% for request in incoming_requests %}
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="fs-sm">{{ request.from_user.username }}</span>
-                        <div>
-                            <a href="{% url 'chatapp:accept_contact_request' request.id %}" class="btn btn-sm btn-success py-0 px-1">Accept</a>
-                            <a href="{% url 'chatapp:decline_contact_request' request.id %}" class="btn btn-sm btn-danger py-0 px-1">Decline</a>
-                        </div>
-                    </div>
-                {% endfor %}
+        <div class="p-3 border-bottom bg-light">
+            <h6 class="fw-bold mb-2">Contact Requests</h6>
+            {% for request in incoming_requests %}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fs-sm">{{ request.from_user.username }}</span>
+                <div>
+                    <a href="{% url 'chatapp:accept_contact_request' request.id %}"
+                        class="btn btn-sm btn-success py-0 px-1">Accept</a>
+                    <a href="{% url 'chatapp:decline_contact_request' request.id %}"
+                        class="btn btn-sm btn-danger py-0 px-1">Decline</a>
+                </div>
             </div>
+            {% endfor %}
+        </div>
         {% endif %}
 
         <div class="sidebar-header d-flex justify-content-between align-items-center">
@@ -164,68 +190,72 @@
                 <i class="bi bi-person-plus-fill"></i> Add
             </a>
         </div>
-        
+
         <div class="contact-list">
             {% for contact in contacts %}
-                <a href="{% url 'chatapp:dashboard_chat' contact.user.id %}" class="contact-item {% if selected_contact.user.id == contact.user.id %}active{% endif %}">
-                    <img src="{{ contact.profile_picture.url }}" alt="Profile" class="rounded-circle">
-                    <div class="contact-info">
-                        <h6 class="mb-0 fw-bold">{{ contact.display_name|default:contact.user.username }}</h6>
-                        <small class="text-muted">@{{ contact.user.username }}</small>
-                    </div>
-                </a>
+            <a href="{% url 'chatapp:dashboard_chat' contact.user.id %}"
+                class="contact-item {% if selected_contact.user.id == contact.user.id %}active{% endif %}">
+                <img src="{{ contact.profile_picture.url }}" alt="Profile" class="rounded-circle">
+                <div class="contact-info">
+                    <h6 class="mb-0 fw-bold">{{ contact.display_name|default:contact.user.username }}</h6>
+                    <small class="text-muted">@{{ contact.user.username }}</small>
+                </div>
+            </a>
             {% empty %}
-                <p class="p-3 text-muted">You have no contacts yet.</p>
+            <p class="p-3 text-muted">You have no contacts yet.</p>
             {% endfor %}
         </div>
     </div>
 
     <div class="chat-area">
         {% if selected_contact %}
-            <div class="chat-header shadow-sm">
-                <img src="{{ selected_contact.profile_picture.url }}" alt="Profile" class="rounded-circle me-2">
-                <div>
-                    <h6 class="mb-0 fw-bold">{{ selected_contact.display_name|default:selected_contact.user.username }}</h6>
-                    <small class="text-muted">@{{ selected_contact.user.username }}</small>
-                </div>
+        <div class="chat-header shadow-sm">
+            <img src="{{ selected_contact.profile_picture.url }}" alt="Profile" class="rounded-circle me-2">
+            <div>
+                <h6 class="mb-0 fw-bold">{{ selected_contact.display_name|default:selected_contact.user.username }}</h6>
+                <small class="text-muted">@{{ selected_contact.user.username }}</small>
             </div>
+        </div>
 
-            <div class="chat-messages" id="chat-messages">
-                {% for message in messages %}
-                    {% if message.sender == user %}
-                        <div class="message-bubble sent">
-                            <p class="mb-0">{{ message.content }}</p>
-                            <div class="message-time">{{ message.timestamp|date:"h:i A" }}</div>
-                        </div>
-                    {% else %}
-                        <div class="message-bubble received">
-                            <p class="mb-0">{{ message.content }}</p>
-                            <div class="message-time">{{ message.timestamp|date:"h:i A" }}</div>
-                        </div>
-                    {% endif %}
-                {% empty %}
-                    <p class="text-center text-muted">This is the beginning of your conversation.</p>
-                {% endfor %}
+        <div class="chat-messages" id="chat-messages">
+            {% for message in messages %}
+            {% if message.sender == user %}
+            <div class="message-bubble sent">
+                <p class="mb-0">{{ message.content }}</p>
+                <div class="message-time">{{ message.timestamp|date:"h:i A" }}</div>
             </div>
+            {% else %}
+            <div class="message-bubble received">
+                <p class="mb-0">{{ message.content }}</p>
+                <div class="message-time">{{ message.timestamp|date:"h:i A" }}</div>
+            </div>
+            {% endif %}
+            {% empty %}
+            <p class="text-center text-muted">This is the beginning of your conversation.</p>
+            {% endfor %}
+        </div>
 
-            <div class="chat-input">
-                <form method="POST" class="input-group">
-                    {% csrf_token %}
-                    <input type="text" class="form-control" placeholder="Type a message..." disabled>
-                    <button class="btn btn-primary ms-2" type="submit" disabled>
-                        <i class="bi bi-send-fill"></i>
-                    </button>
-                </form>
-            </div>
+        <div class="chat-input">
+            <form method="POST" action="{% url 'chatapp:send_message' selected_contact.user.id %}" class="input-group"
+                id="chat-form">
+                {% csrf_token %}
+                <input type="text" name="content" id="message-input" class="form-control"
+                    placeholder="Type a message..." required>
+                <button class="btn btn-primary ms-2" type="submit">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </form>
+        </div>
 
         {% else %}
-            <div classs="placeholder-area" style="display:flex; flex-grow:1; justify-content:center; align-items:center; text-align:center; color:#495057;">
-                <div>
-                    <i class="bi bi-chat-dots-fill" style="font-size: 5rem;"></i>
-                    <h3 class="mt-3">Welcome to Collab-X</h3>
-                    <p class="fs-5 text-muted">Select a contact to start messaging.</p>
-                </div>
+        <div classs="placeholder-area"
+            style="display:flex; flex-grow:1; justify-content:center; align-items:center; text-align:center; color:#495057;">
+            <div>
+                <i class="bi bi-chat-dots-fill" style="font-size: 5rem;"></i>
+                <h3 class="mt-3">Welcome to Collab-X</h3>
+                <p class="fs-5 text-muted">Select a contact to start messaging.</p>
             </div>
+        </div>
         {% endif %}
     </div>
 </div>
@@ -233,11 +263,81 @@
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+
+        // 1. Scroll to the bottom on load
         if (chatMessages) {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
+
+        // 2. Handle Message Submission via AJAX
+        if (chatForm) {
+            chatForm.addEventListener('submit', function (e) {
+                e.preventDefault(); // Stop the default page reload
+
+                const message = messageInput.value.trim();
+                if (message === '') {
+                    return; // Don't send empty messages
+                }
+
+                const formData = new FormData(chatForm);
+
+                // Get the current URL from the form action
+                const sendUrl = chatForm.getAttribute('action');
+
+                fetch(sendUrl, {
+                    method: 'POST',
+                    body: formData,
+                    // Django's CSRF token is already included in formData
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'ok') {
+                            // A. Create the message bubble element
+                            const bubble = createMessageBubble(data.content, data.timestamp, data.is_sent);
+
+                            // B. Append to chat area
+                            chatMessages.appendChild(bubble);
+
+                            // C. Scroll to new message
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                            // D. Clear input field
+                            messageInput.value = '';
+                        } else {
+                            console.error('Error sending message:', data.message);
+                            alert('Failed to send message: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Network or server error:', error);
+                        alert('An error occurred during transmission.');
+                    });
+            });
+        }
+
+        // Helper function to dynamically create the message HTML structure
+        function createMessageBubble(content, timestamp, isSent) {
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('message-bubble', isSent ? 'sent' : 'received');
+
+            const contentP = document.createElement('p');
+            contentP.classList.add('mb-0');
+            contentP.textContent = content;
+
+            const timeDiv = document.createElement('div');
+            timeDiv.classList.add('message-time');
+            timeDiv.textContent = timestamp;
+
+            bubbleDiv.appendChild(contentP);
+            bubbleDiv.appendChild(timeDiv);
+
+            return bubbleDiv;
+        }
+
     });
 </script>
 {% endblock %}

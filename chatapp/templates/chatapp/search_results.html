@@ -2,8 +2,8 @@
 {% block title %}Search Users | Collab-X{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2 class="mb-4">Find Users</h2>
+<div class="container mt-4">
+    <h2 class="mb-4 fw-bold">Find Users</h2>
     <form method="GET" action="{% url 'chatapp:search_users' %}">
         <div class="input-group mb-3">
             <input type="text" class="form-control" placeholder="Search by username..." name="q" value="{{ request.GET.q }}">
@@ -12,19 +12,33 @@
     </form>
 
     {% if results %}
-        <h4 class="mt-4">Results:</h4>
-        <ul class="list-group">
+        <h4 class="mt-4">Results ({{ results.count }} user{% if results.count != 1 %}s{% endif %} found):</h4>
+        <ul class="list-group list-group-flush">
             {% for user in results %}
-    <p>
-        {{ user.username }}
-        <a href="{% url 'chatapp:send_contact_request' user.id %}" class="btn btn-primary btn-sm">
-            Send Request
-        </a>
-    </p>
-{% endfor %}
+            <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                <div class="d-flex align-items-center">
+                    <img src="{{ user.profile.profile_picture.url }}" alt="Profile" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
+                    <div class="user-info">
+                        <h5 class="mb-0 fw-bold">{{ user.profile.display_name|default:user.username }}</h5>
+                        <small class="text-muted">@{{ user.username }}</small>
+                    </div>
+                </div>
+
+                {% comment %} 
+                FUTURE IMPROVEMENT: Add logic here to check if a request 
+                is already pending or if they are already contacts. 
+                For now, just assume they can send a request.
+                {% endcomment %}
+                <a href="{% url 'chatapp:send_contact_request' user.id %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-person-plus-fill me-1"></i> Send Request
+                </a>
+            </li>
+            {% endfor %}
         </ul>
     {% elif request.GET.q %}
-        <p>No users found matching your search.</p>
+        <div class="alert alert-info mt-4" role="alert">
+            <i class="bi bi-info-circle-fill me-2"></i> No users found matching your search term: **{{ request.GET.q }}**.
+        </div>
     {% endif %}
 </div>
 {% endblock %}

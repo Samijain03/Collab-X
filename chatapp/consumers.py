@@ -1,0 +1,134 @@
+# chatapp/consumers.py
+
+import json
+from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
+from django.contrib.auth.models import User
+from .models import Message, Profile
+
+class ChatConsumer(AsyncWebsocketConsumer):
+    
+    async def connect(self):
+        try:
+            # 1. Get user and contact_id from the URL
+            self.user = self.scope['user']
+            self.contact_id = self.scope['url_route']['kwargs']['contact_id']
+            
+            # 2. Check if user is authenticated
+            if not self.user.is_authenticated:
+                print(f"[WebSocket] REJECT: User is not authenticated.")
+                await self.close()
+                return
+                
+            print(f"[WebSocket] INFO: User '{self.user.username}' attempting to connect to chat with user_id '{self.contact_id}'.")
+
+            # 3. Get the contact user object
+            self.contact_user = await self.get_user(self.contact_id)
+            
+            # 4. Get profiles
+            self.contact_profile = await self.get_profile(self.contact_user)
+            self.user_profile = await self.get_profile(self.user)
+            
+            # 5. Security Check: Ensure they are contacts
+            are_contacts = await self.check_contacts(self.user_profile, self.contact_user)
+            if not are_contacts:
+                print(f"[WebSocket] REJECT: User '{self.user.username}' and '{self.contact_user.username}' are not contacts.")
+                await self.close()
+                return
+
+        except User.DoesNotExist:
+            print(f"[WebSocket] ERROR: User with id={self.contact_id} does not exist.")
+            await self.close()
+            return
+        except Profile.DoesNotExist:
+            print(f"[WebSocket] ERROR: A Profile is missing for user '{self.user.username}' or contact '{self.contact_user.username}'.")
+            await self.close()
+            return
+        except Exception as e:
+            print(f"[WebSocket] ERROR: An unexpected error occurred: {e}")
+            await self.close()
+            return
+            
+        # 6. Create a unique, private room name for the pair
+        user_ids = sorted([self.user.id, self.contact_user.id])
+        self.room_group_name = f'chat_{user_ids[0]}_{user_ids[1]}'
+
+        # 7. Join the room
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+
+        # 8. Accept the connection
+        print(f"[WebSocket] ACCEPT: Connection accepted for '{self.user.username}' to room '{self.room_group_name}'.")
+        await self.accept()
+
+
+    async def disconnect(self, close_code):
+        # Leave the room
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+
+    # Receive message from WebSocket (frontend JavaScript)
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        message_content = data['message']
+
+        if not message_content.strip():
+            return # Don't send empty messages
+
+        # 1. Save the new message to the database
+        new_message = await self.save_message(
+            sender=self.user,
+            receiver=self.contact_user,
+            content=message_content
+        )
+
+        # 2. Broadcast the message to the room
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'chat_message', # This calls the 'chat_message' method
+                'message': new_message.content,
+                'sender_username': self.user.username,
+                'timestamp': new_message.timestamp.strftime("%I:%M %p") # 12-hr format
+            }
+        )
+
+    # Receive message from room group (broadcast)
+    async def chat_message(self, event):
+        # This method is called when a message is broadcast to the group
+        
+        # Send message data to the WebSocket (client)
+        await self.send(text_data=json.dumps({
+            'content': event['message'],
+            'sender_username': event['sender_username'],
+            'timestamp': event['timestamp'],
+        }))
+
+    # --- (THE FIX) DATABASE HELPER FUNCTIONS ---
+    # These helpers allow us to call synchronous Django ORM
+    # code from our async consumer.
+
+    @database_sync_to_async
+    def get_user(self, user_id):
+        return User.objects.get(id=user_id)
+
+    @database_sync_to_async
+    def get_profile(self, user):
+        return Profile.objects.get(user=user)
+
+    @database_sync_to_async
+    def check_contacts(self, user_profile, contact_user):
+        return user_profile.contacts.filter(user=contact_user).exists()
+
+    @database_sync_to_async
+    def save_message(self, sender, receiver, content):
+        return Message.objects.create(
+            sender=sender,
+            receiver=receiver,
+            content=content
+        )

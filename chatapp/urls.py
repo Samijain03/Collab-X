@@ -22,6 +22,4 @@ urlpatterns = [
     path('accept-request/<int:request_id>/', views.accept_contact_request_view, name='accept_contact_request'),
     path('decline-request/<int:request_id>/', views.decline_contact_request_view, name='decline_contact_request'),
 
-    # NEW: Messaging Logic for AJAX POST
-    path('chat/send/<int:receiver_id>/', views.send_message_view, name='send_message'),
 ]

@@ -4,3 +4,8 @@ PyJWT
 django-crispy-forms
 crispy-bootstrap5
 pillow
+
+# Added for real-time chat (WebSockets)
+asgiref>=3.0
+channels>=4.0
+daphne>=4.0

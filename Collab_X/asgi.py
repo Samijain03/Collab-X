@@ -1,16 +1,28 @@
-"""
-ASGI config for Collab_X project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
-"""
+# Collab_X/asgi.py
 
 import os
-
+import django
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Collab_X.settings')
+# --- THIS IS THE FIX ---
+# We must set the settings module and run django.setup()
+# BEFORE importing any other part of your app (like routing).
 
-application = get_asgi_application()
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Collab_X.settings')
+django.setup()
+
+# --- END OF FIX ---
+
+# These imports must come AFTER django.setup()
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+import chatapp.routing
+
+application = ProtocolTypeRouter({
+    "http": get_asgi_application(),
+    "websocket": AuthMiddlewareStack(
+        URLRouter(
+            chatapp.routing.websocket_urlpatterns
+        )
+    ),
+})

@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',
     'chatapp',
     'django.contrib.sites', 
     'allauth',
@@ -77,6 +78,12 @@ TEMPLATES = [
     },
 ]
 
+ASGI_APPLICATION = 'Collab_X.asgi.application'
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}
 WSGI_APPLICATION = 'Collab_X.wsgi.application'
 
 

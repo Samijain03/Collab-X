@@ -1,3 +1,5 @@
+# chatapp/views.py
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import AuthenticationForm
@@ -8,8 +10,7 @@ from django.db.models import Q
 from django.contrib import messages
 from .forms import SignUpForm, ProfileUpdateForm
 from .models import ContactRequest, Profile, Message # ADD Profile and Message imports
-from django.http import JsonResponse, Http404 # Ensure JsonResponse is imported
-from django.views.decorators.http import require_POST # Import for security
+# --- Removed JsonResponse, Http404, and require_POST ---
 
 # Homepage View
 def home(request):
@@ -173,42 +174,3 @@ def settings_view(request):
         'title': 'Account Settings'
     }
     return render(request, 'chatapp/settings.html', context)
-
-@login_required
-@require_POST
-def send_message_view(request, receiver_id):
-    # 1. Get the contact (receiver) user object
-    try:
-        # Use get_object_or_404 as a cleaner way to handle missing users, 
-        # then return a JsonResponse error if the user is missing.
-        receiver_user = User.objects.get(id=receiver_id)
-    except User.DoesNotExist:
-        # Correctly handles the error, returns a 404 status, and stops trying to access new_message.
-        return JsonResponse({'status': 'error', 'message': 'Receiver user not found.'}, status=404)
-
-    # 2. Security check: ensure they are contacts
-    if not request.user.profile.contacts.filter(user=receiver_user).exists():
-        return JsonResponse({'status': 'error', 'message': 'You can only send messages to your contacts.'}, status=403)
-    
-    # 3. Get message content and validate
-    content = request.POST.get('content')
-    
-    if not content or not content.strip():
-        return JsonResponse({'status': 'error', 'message': 'Message content cannot be empty.'}, status=400)
-        
-    # 4. Create the Message object
-    new_message = Message.objects.create(
-        sender=request.user,
-        receiver=receiver_user,
-        content=content.strip()
-    )
-    
-    # 5. Return a success response with correct formatting
-    return JsonResponse({
-        'status': 'ok',
-        'message_id': new_message.id,
-        'content': new_message.content,
-        # Corrected time formatting: %I for 12-hour clock
-        'timestamp': new_message.timestamp.strftime("%I:%M %p"), 
-        'is_sent': True,
-    })

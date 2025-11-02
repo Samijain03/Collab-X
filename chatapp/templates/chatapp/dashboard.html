@@ -4,6 +4,8 @@
 
 {% block extra_head %}
 <style>
+    /* --- ALL YOUR EXISTING CSS --- */
+    /* (Styles are unchanged) */
     .chat-container {
         display: flex;
         flex-grow: 1;
@@ -166,7 +168,6 @@
 <div class="chat-container">
 
     <div class="sidebar">
-
         {% if incoming_requests %}
         <div class="p-3 border-bottom bg-light">
             <h6 class="fw-bold mb-2">Contact Requests</h6>
@@ -236,10 +237,8 @@
         </div>
 
         <div class="chat-input">
-            <form method="POST" action="{% url 'chatapp:send_message' selected_contact.user.id %}" class="input-group"
-                id="chat-form">
-                {% csrf_token %}
-                <input type="text" name="content" id="message-input" class="form-control"
+            <form class.="input-group" id="chat-form">
+                <input type="text" id="message-input" class="form-control"
                     placeholder="Type a message..." required>
                 <button class="btn btn-primary ms-2" type="submit">
                     <i class="bi bi-send-fill"></i>
@@ -261,61 +260,75 @@
 </div>
 {% endblock %}
 
+
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const chatMessages = document.getElementById('chat-messages');
         const chatForm = document.getElementById('chat-form');
         const messageInput = document.getElementById('message-input');
+        
+        let chatSocket = null;
 
         // 1. Scroll to the bottom on load
         if (chatMessages) {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // 2. Handle Message Submission via AJAX
+        // 2. Get data from Django (only if a chat is selected)
+        {% if selected_contact %}
+            const currentUsername = "{{ user.username }}";
+            const contactId = "{{ selected_contact.user.id }}";
+
+            // 3. Determine WebSocket protocol (ws:// or wss://)
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws/chat/${contactId}/`;
+
+            // 4. Create and connect the WebSocket
+            chatSocket = new WebSocket(wsUrl);
+
+            // 5. Handle incoming messages
+            chatSocket.onmessage = function (e) {
+                const data = JSON.parse(e.data);
+
+                // Check if the message was sent by the current user
+                const isSent = (data.sender_username === currentUsername);
+
+                // Create the bubble and add it
+                const bubble = createMessageBubble(data.content, data.timestamp, isSent);
+                chatMessages.appendChild(bubble);
+                chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+            };
+
+            // 6. Handle socket close/error
+            chatSocket.onclose = function (e) {
+                console.error('Chat socket closed unexpectedly', e);
+            };
+            chatSocket.onerror = function (e) {
+                console.error('WebSocket error:', e);
+            };
+        {% endif %}
+
+
+        // 7. Handle form submission (Send message)
         if (chatForm) {
             chatForm.addEventListener('submit', function (e) {
-                e.preventDefault(); // Stop the default page reload
+                e.preventDefault(); // Stop page reload
 
                 const message = messageInput.value.trim();
-                if (message === '') {
-                    return; // Don't send empty messages
+                
+                // Check for empty message or no socket connection
+                if (message === '' || chatSocket === null) {
+                    return;
                 }
 
-                const formData = new FormData(chatForm);
+                // Send message to WebSocket
+                chatSocket.send(JSON.stringify({
+                    'message': message
+                }));
 
-                // Get the current URL from the form action
-                const sendUrl = chatForm.getAttribute('action');
-
-                fetch(sendUrl, {
-                    method: 'POST',
-                    body: formData,
-                    // Django's CSRF token is already included in formData
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'ok') {
-                            // A. Create the message bubble element
-                            const bubble = createMessageBubble(data.content, data.timestamp, data.is_sent);
-
-                            // B. Append to chat area
-                            chatMessages.appendChild(bubble);
-
-                            // C. Scroll to new message
-                            chatMessages.scrollTop = chatMessages.scrollHeight;
-
-                            // D. Clear input field
-                            messageInput.value = '';
-                        } else {
-                            console.error('Error sending message:', data.message);
-                            alert('Failed to send message: ' + data.message);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Network or server error:', error);
-                        alert('An error occurred during transmission.');
-                    });
+                // Clear input field
+                messageInput.value = '';
             });
         }
 

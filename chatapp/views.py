@@ -8,9 +8,10 @@ from .forms import SignUpForm
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.contrib import messages
-from .forms import SignUpForm, ProfileUpdateForm
-from .models import ContactRequest, Profile, Message # ADD Profile and Message imports
-# --- Removed JsonResponse, Http404, and require_POST ---
+# --- UPDATED IMPORTS ---
+from .forms import SignUpForm, ProfileUpdateForm, CreateGroupForm
+from .models import ContactRequest, Profile, Message, Group, GroupMessage
+
 
 # Homepage View
 def home(request):
@@ -18,28 +19,23 @@ def home(request):
 
 # Signup View
 def signup_view(request):
-    # If user is already logged in, redirect them to the dashboard
     if request.user.is_authenticated:
         return redirect('chatapp:dashboard')
-
     if request.method == 'POST':
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save()
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-            return redirect('chatapp:dashboard') # Redirect to dashboard
+            return redirect('chatapp:dashboard') 
     else:
         form = SignUpForm()
-    
     context = {'form': form, 'title': 'Create an Account'}
     return render(request, 'chatapp/signup.html', context)
 
 # Login View
 def login_view(request):
-    # If user is already logged in, redirect them to the dashboard
     if request.user.is_authenticated:
         return redirect('chatapp:dashboard')
-        
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
@@ -51,55 +47,72 @@ def login_view(request):
                 return redirect('chatapp:dashboard') 
     else:
         form = AuthenticationForm()
-    
     context = {'form': form, 'title': 'Log In'}
     return render(request, 'chatapp/login.html', context)
 
 # Logout View
 def logout_view(request):
     logout(request)
-    return redirect('chatapp:home') # Redirect to homepage after logout
+    return redirect('chatapp:home') 
 
-# --- UPDATED: Dashboard View ---
+# --- REPLACED: Dashboard View (Handles 1-to-1 and Group) ---
 @login_required
-def dashboard_view(request, contact_id=None): # Added contact_id
+def dashboard_view(request, contact_id=None, group_id=None):
     profile = request.user.profile
     contacts_profiles = profile.contacts.all()
+    user_groups = request.user.chat_groups.all()
     incoming_requests = ContactRequest.objects.filter(to_user=request.user)
     
     context = {
         'contacts': contacts_profiles,
+        'groups': user_groups,
         'incoming_requests': incoming_requests,
         'selected_contact': None,
+        'selected_group': None,
         'messages': [],
+        'chat_type': None,
+        'chat_id': None,
     }
 
     if contact_id:
         try:
-            # Get the profile of the selected contact
             selected_contact_profile = Profile.objects.get(user__id=contact_id)
             selected_contact_user = selected_contact_profile.user
             
-            # Security check: ensure this user is actually in the contact list
             if selected_contact_profile in contacts_profiles:
                 context['selected_contact'] = selected_contact_profile
                 
-                # Fetch messages between the two users
                 messages_query = Message.objects.filter(
                     (Q(sender=request.user) & Q(receiver=selected_contact_user)) |
                     (Q(sender=selected_contact_user) & Q(receiver=request.user))
                 ).order_by('timestamp')
                 context['messages'] = messages_query
+                context['chat_type'] = '1on1'
+                context['chat_id'] = selected_contact_profile.user.id
             else:
                 messages.error(request, "This user is not in your contact list.")
                 return redirect('chatapp:dashboard')
-
         except Profile.DoesNotExist:
             messages.error(request, "User profile not found.")
             return redirect('chatapp:dashboard')
+            
+    elif group_id:
+        try:
+            selected_group = Group.objects.get(id=group_id)
+            if selected_group in user_groups:
+                context['selected_group'] = selected_group
+                context['messages'] = selected_group.messages.all().order_by('timestamp')
+                context['chat_type'] = 'group'
+                context['chat_id'] = selected_group.id
+            else:
+                messages.error(request, "You are not a member of this group.")
+                return redirect('chatapp:dashboard')
+        except Group.DoesNotExist:
+            messages.error(request, "Group not found.")
+            return redirect('chatapp:dashboard')
 
     return render(request, 'chatapp/dashboard.html', context)
-# --- End of Updated View ---
+# --- End of Replaced View ---
 
 
 @login_required
@@ -110,10 +123,7 @@ def search_users_view(request):
         results = User.objects.filter(
             Q(username__icontains=query)
         ).exclude(username=request.user.username)
-    
-    context = {
-        'results': results,
-    }
+    context = {'results': results}
     return render(request, 'chatapp/search_results.html', context)
 
 @login_required
@@ -129,22 +139,18 @@ def send_contact_request_view(request, user_id):
             messages.success(request, f'Contact request sent to {user_to_request.username}!')
     except User.DoesNotExist:
         messages.error(request, 'User not found.')
-    
     return redirect('chatapp:search_users')
 
 @login_required
 def accept_contact_request_view(request, request_id):
     try:
         contact_request = ContactRequest.objects.get(id=request_id, to_user=request.user)
-        
         request.user.profile.contacts.add(contact_request.from_user.profile)
         contact_request.from_user.profile.contacts.add(request.user.profile)
-        
         contact_request.delete()
         messages.success(request, f'You are now contacts with {contact_request.from_user.username}!')
     except ContactRequest.DoesNotExist:
         messages.error(request, 'Contact request not found or invalid.')
-        
     return redirect('chatapp:dashboard')
 
 @login_required
@@ -155,7 +161,6 @@ def decline_contact_request_view(request, request_id):
         messages.info(request, 'Contact request declined.')
     except ContactRequest.DoesNotExist:
         messages.error(request, 'Contact request not found or invalid.')
-        
     return redirect('chatapp:dashboard')
 
 @login_required
@@ -168,9 +173,33 @@ def settings_view(request):
             return redirect('chatapp:settings')
     else:
         form = ProfileUpdateForm(instance=request.user.profile)
-
-    context = {
-        'form': form,
-        'title': 'Account Settings'
-    }
+    context = {'form': form, 'title': 'Account Settings'}
     return render(request, 'chatapp/settings.html', context)
+
+# --- ADD THIS NEW VIEW AT THE END ---
+
+@login_required
+def create_group_view(request):
+    if request.method == 'POST':
+        # Pass the request.user to the form
+        form = CreateGroupForm(request.POST, user=request.user)
+        if form.is_valid():
+            name = form.cleaned_data['name']
+            selected_members = form.cleaned_data['members']
+            
+            # Create the new group
+            new_group = Group.objects.create(name=name, creator=request.user)
+            
+            # Add the selected members
+            new_group.members.set(selected_members)
+            # CRITICAL: Add the creator to the group as well!
+            new_group.members.add(request.user)
+            
+            messages.success(request, f"Group '{name}' created successfully!")
+            # Redirect to the new group's chat page
+            return redirect('chatapp:dashboard_group_chat', group_id=new_group.id)
+    else:
+        # Pass the request.user to the form
+        form = CreateGroupForm(user=request.user)
+
+    return render(request, 'chatapp/create_group.html', {'form': form})

@@ -4,7 +4,8 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
-from .models import Message, Profile
+# --- UPDATED IMPORTS ---
+from .models import Message, Profile, Group, GroupMessage
 
 class ChatConsumer(AsyncWebsocketConsumer):
     
@@ -109,10 +110,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'timestamp': event['timestamp'],
         }))
 
-    # --- (THE FIX) DATABASE HELPER FUNCTIONS ---
-    # These helpers allow us to call synchronous Django ORM
-    # code from our async consumer.
-
+    # --- DATABASE HELPER FUNCTIONS ---
+    
     @database_sync_to_async
     def get_user(self, user_id):
         return User.objects.get(id=user_id)
@@ -130,5 +129,111 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return Message.objects.create(
             sender=sender,
             receiver=receiver,
+            content=content
+        )
+
+
+# --- ADD THIS ENTIRE NEW CLASS FOR GROUP CHAT ---
+
+class GroupChatConsumer(AsyncWebsocketConsumer):
+    
+    async def connect(self):
+        try:
+            self.user = self.scope['user']
+            self.group_id = self.scope['url_route']['kwargs']['group_id']
+
+            if not self.user.is_authenticated:
+                print("[WebSocket] REJECT: User is not authenticated.")
+                await self.close()
+                return
+
+            print(f"[WebSocket] INFO: User '{self.user.username}' attempting to connect to group '{self.group_id}'.")
+
+            # Get the group and check if the user is a member
+            self.group = await self.get_group(self.group_id)
+            is_member = await self.check_membership(self.group, self.user)
+
+            if not is_member:
+                print(f"[WebSocket] REJECT: User '{self.user.username}' is not a member of group '{self.group_id}'.")
+                await self.close()
+                return
+        
+        except Group.DoesNotExist:
+            print(f"[WebSocket] ERROR: Group with id={self.group_id} does not exist.")
+            await self.close()
+            return
+        except Exception as e:
+            print(f"[WebSocket] ERROR: An unexpected error occurred: {e}")
+            await self.close()
+            return
+
+        # Set the room name
+        self.room_group_name = f'group_{self.group_id}'
+
+        # Join the room
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+
+        # Accept the connection
+        print(f"[WebSocket] ACCEPT: Connection accepted for '{self.user.username}' to room '{self.room_group_name}'.")
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+
+    # Receive message from WebSocket
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        message_content = data['message']
+
+        if not message_content.strip():
+            return
+
+        # Save the new group message
+        new_message = await self.save_group_message(
+            group=self.group,
+            sender=self.user,
+            content=message_content
+        )
+
+        # Broadcast the message to the room
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'group_chat_message',
+                'message': new_message.content,
+                'sender_username': self.user.username,
+                'timestamp': new_message.timestamp.strftime("%I:%M %p")
+            }
+        )
+
+    # Receive message from room group
+    async def group_chat_message(self, event):
+        await self.send(text_data=json.dumps({
+            'content': event['message'],
+            'sender_username': event['sender_username'],
+            'timestamp': event['timestamp'],
+        }))
+
+    # --- Database Helpers for Group ---
+    @database_sync_to_async
+    def get_group(self, group_id):
+        return Group.objects.get(id=group_id)
+
+    @database_sync_to_async
+    def check_membership(self, group, user):
+        return group.members.filter(id=user.id).exists()
+
+    @database_sync_to_async
+    def save_group_message(self, group, sender, content):
+        return GroupMessage.objects.create(
+            group=group,
+            sender=sender,
             content=content
         )

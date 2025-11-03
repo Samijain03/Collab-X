@@ -58,3 +58,31 @@ class ProfileUpdateForm(forms.ModelForm):
             'about_me': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'profile_picture': forms.FileInput(attrs={'style': 'display: none;', 'accept': 'image/*'}),
         }
+
+# --- ADD THIS NEW FORM FOR CREATING GROUPS ---
+
+class CreateGroupForm(forms.Form):
+    name = forms.CharField(
+        max_length=100, 
+        label="Group Name",
+        widget=forms.TextInput(attrs={'placeholder': 'Enter a name for your group'})
+    )
+    
+    members = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(), # We'll set this in __init__
+        widget=forms.CheckboxSelectMultiple,
+        label="Select Members (from your contacts)"
+    )
+
+    def __init__(self, *args, **kwargs):
+        # We must get the 'user' from the view to filter the queryset
+        self.user = kwargs.pop('user')
+        super().__init__(*args, **kwargs)
+        
+        # Get the user's contacts' profiles
+        contact_profiles = self.user.profile.contacts.all()
+        # Get the User objects from those profiles
+        contact_users = User.objects.filter(profile__in=contact_profiles)
+        
+        # Set the queryset for the 'members' field
+        self.fields['members'].queryset = contact_users

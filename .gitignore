@@ -38,6 +38,7 @@ local_settings.py
 *.sql
 *.dump
 *.db
+db.sqlite3
 data/
 backups/
 tmp/
@@ -59,3 +60,11 @@ Thumbs.db
 node_modules/
 dist/
 build/
+
+# Ignore Django database
+db.sqlite3
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+

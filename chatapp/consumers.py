@@ -76,38 +76,67 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # Receive message from WebSocket (frontend JavaScript)
     async def receive(self, text_data):
         data = json.loads(text_data)
-        message_content = data['message']
+        message_type = data.get('type', 'chat_message') # Default to chat_message
 
-        if not message_content.strip():
-            return # Don't send empty messages
+        if message_type == 'chat_message':
+            message_content = data['message']
+            if not message_content.strip():
+                return # Don't send empty messages
 
-        # 1. Save the new message to the database
-        new_message = await self.save_message(
-            sender=self.user,
-            receiver=self.contact_user,
-            content=message_content
-        )
+            # 1. Save the new message to the database
+            new_message = await self.save_message(
+                sender=self.user,
+                receiver=self.contact_user,
+                content=message_content
+            )
 
-        # 2. Broadcast the message to the room
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message', # This calls the 'chat_message' method
-                'message': new_message.content,
-                'sender_username': self.user.username,
-                'timestamp': new_message.timestamp.strftime("%I:%M %p") # 12-hr format
-            }
-        )
+            # 2. Broadcast the message to the room
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat_message', # This calls the 'chat_message' method
+                    'message_id': new_message.id, # <-- Send ID
+                    'message': new_message.content,
+                    'sender_username': self.user.username,
+                    'timestamp': new_message.timestamp.strftime("%I:%M %p") # 12-hr format
+                }
+            )
+        
+        elif message_type == 'delete_message':
+            message_id = data['message_id']
+            # Delete the message (marks as deleted, checks sender)
+            deleted_message = await self.delete_message(message_id)
+            
+            if deleted_message:
+                # Broadcast that the message was deleted
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'message_deleted', # This calls 'message_deleted'
+                        'message_id': deleted_message.id,
+                    }
+                )
 
     # Receive message from room group (broadcast)
     async def chat_message(self, event):
-        # This method is called when a message is broadcast to the group
+        # This method is called when a 'chat_message' type is broadcast
         
         # Send message data to the WebSocket (client)
         await self.send(text_data=json.dumps({
+            'type': 'chat_message', # <-- Send type
+            'message_id': event['message_id'], # <-- Send ID
             'content': event['message'],
             'sender_username': event['sender_username'],
             'timestamp': event['timestamp'],
+        }))
+
+    # --- ADD THIS NEW HANDLER ---
+    # Receive delete confirmation from room group (broadcast)
+    async def message_deleted(self, event):
+        # This method is called when a 'message_deleted' type is broadcast
+        await self.send(text_data=json.dumps({
+            'type': 'message_deleted',
+            'message_id': event['message_id'],
         }))
 
     # --- DATABASE HELPER FUNCTIONS ---
@@ -131,9 +160,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
             receiver=receiver,
             content=content
         )
+        
+    # --- ADD THIS NEW DB HELPER ---
+    @database_sync_to_async
+    def delete_message(self, message_id):
+        """Finds a message, checks ownership, and marks it as deleted."""
+        try:
+            # Security: Only the sender can delete their own message
+            msg = Message.objects.get(id=message_id, sender=self.user)
+            if not msg.is_deleted:
+                msg.is_deleted = True
+                msg.content = "This message was deleted."
+                msg.save()
+                return msg
+        except Message.DoesNotExist:
+            return None
+        return None
 
 
-# --- ADD THIS ENTIRE NEW CLASS FOR GROUP CHAT ---
+# --- UPDATED CLASS FOR GROUP CHAT (with delete) ---
 
 class GroupChatConsumer(AsyncWebsocketConsumer):
     
@@ -190,35 +235,60 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
     # Receive message from WebSocket
     async def receive(self, text_data):
         data = json.loads(text_data)
-        message_content = data['message']
+        message_type = data.get('type', 'chat_message')
 
-        if not message_content.strip():
-            return
+        if message_type == 'chat_message':
+            message_content = data['message']
+            if not message_content.strip():
+                return
 
-        # Save the new group message
-        new_message = await self.save_group_message(
-            group=self.group,
-            sender=self.user,
-            content=message_content
-        )
+            # Save the new group message
+            new_message = await self.save_group_message(
+                group=self.group,
+                sender=self.user,
+                content=message_content
+            )
 
-        # Broadcast the message to the room
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'group_chat_message',
-                'message': new_message.content,
-                'sender_username': self.user.username,
-                'timestamp': new_message.timestamp.strftime("%I:%M %p")
-            }
-        )
+            # Broadcast the message to the room
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'group_chat_message',
+                    'message_id': new_message.id, # <-- Send ID
+                    'message': new_message.content,
+                    'sender_username': self.user.username,
+                    'timestamp': new_message.timestamp.strftime("%I:%M %p")
+                }
+            )
+            
+        elif message_type == 'delete_message':
+            message_id = data['message_id']
+            deleted_message = await self.delete_group_message(message_id)
+            
+            if deleted_message:
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'message_deleted', # Calls 'message_deleted'
+                        'message_id': deleted_message.id,
+                    }
+                )
 
     # Receive message from room group
     async def group_chat_message(self, event):
         await self.send(text_data=json.dumps({
+            'type': 'chat_message', # <-- Send type
+            'message_id': event['message_id'], # <-- Send ID
             'content': event['message'],
             'sender_username': event['sender_username'],
             'timestamp': event['timestamp'],
+        }))
+        
+    # --- ADD THIS NEW HANDLER ---
+    async def message_deleted(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_deleted',
+            'message_id': event['message_id'],
         }))
 
     # --- Database Helpers for Group ---
@@ -237,3 +307,19 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             sender=sender,
             content=content
         )
+
+    # --- ADD THIS NEW DB HELPER ---
+    @database_sync_to_async
+    def delete_group_message(self, message_id):
+        """Finds a group message, checks ownership, and marks it as deleted."""
+        try:
+            # Security: Only the sender can delete their own message
+            msg = GroupMessage.objects.get(id=message_id, sender=self.user)
+            if not msg.is_deleted:
+                msg.is_deleted = True
+                msg.content = "This message was deleted."
+                msg.save()
+                return msg
+        except GroupMessage.DoesNotExist:
+            return None
+        return None

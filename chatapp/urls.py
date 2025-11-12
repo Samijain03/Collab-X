@@ -19,6 +19,9 @@ urlpatterns = [
     
     # Group Management
     path('create-group/', views.create_group_view, name='create_group'),
+    path('group/<int:group_id>/edit/', views.edit_group_view, name='edit_group'),
+    path('group/<int:group_id>/add-members/', views.add_group_members_view, name='add_group_members'),
+    path('group/<int:group_id>/remove-members/', views.remove_group_members_view, name='remove_group_members'),
 
     # Contact Management
     path('search/', views.search_users_view, name='search_users'),

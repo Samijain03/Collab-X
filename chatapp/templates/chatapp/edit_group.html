@@ -1,0 +1,32 @@
+{% extends 'chatapp/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} | Collab-X{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="card-title text-center fw-bold mb-4">{{ title }}</h2>
+                    <h5 class="text-center text-muted mb-4">{{ group.name }}</h5>
+
+                    <form method="POST" novalidate>
+                        {% csrf_token %}
+                        
+                        {{ form|crispy }}
+
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-primary fw-bold">Save Changes</button>
+                        </div>
+                        <div class="d-grid mt-2">
+                             <a href="{% url 'chatapp:dashboard_group_chat' group.id %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

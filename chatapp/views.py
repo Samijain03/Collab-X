@@ -9,7 +9,10 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django.contrib import messages
 # --- UPDATED IMPORTS ---
-from .forms import SignUpForm, ProfileUpdateForm, CreateGroupForm
+from .forms import (
+    SignUpForm, ProfileUpdateForm, CreateGroupForm,
+    ChangeGroupNameForm, AddGroupMemberForm, RemoveGroupMemberForm
+)
 from .models import ContactRequest, Profile, Message, Group, GroupMessage
 
 
@@ -203,3 +206,70 @@ def create_group_view(request):
         form = CreateGroupForm(user=request.user)
 
     return render(request, 'chatapp/create_group.html', {'form': form})
+
+@login_required
+def edit_group_view(request, group_id):
+    group = get_object_or_404(Group, id=group_id)
+
+    # ADMIN CHECK: Only the creator can edit
+    if group.creator != request.user:
+        messages.error(request, "You do not have permission to edit this group.")
+        return redirect('chatapp:dashboard_group_chat', group_id=group.id)
+
+    if request.method == 'POST':
+        form = ChangeGroupNameForm(request.POST, instance=group)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Group name changed to '{group.name}'.")
+            return redirect('chatapp:dashboard_group_chat', group_id=group.id)
+    else:
+        form = ChangeGroupNameForm(instance=group)
+
+    context = {'form': form, 'group': group, 'title': f'Edit {group.name}'}
+    return render(request, 'chatapp/edit_group.html', context)
+
+
+@login_required
+def add_group_members_view(request, group_id):
+    group = get_object_or_404(Group, id=group_id)
+
+    # ADMIN CHECK
+    if group.creator != request.user:
+        messages.error(request, "You do not have permission to add members.")
+        return redirect('chatapp:dashboard_group_chat', group_id=group.id)
+
+    if request.method == 'POST':
+        form = AddGroupMemberForm(request.POST, user=request.user, group=group)
+        if form.is_valid():
+            new_members = form.cleaned_data['members']
+            group.members.add(*new_members)
+            messages.success(request, f"Added {len(new_members)} new member(s).")
+            return redirect('chatapp:dashboard_group_chat', group_id=group.id)
+    else:
+        form = AddGroupMemberForm(user=request.user, group=group)
+
+    context = {'form': form, 'group': group, 'title': 'Add Members'}
+    return render(request, 'chatapp/edit_group.html', context)
+
+
+@login_required
+def remove_group_members_view(request, group_id):
+    group = get_object_or_404(Group, id=group_id)
+
+    # ADMIN CHECK
+    if group.creator != request.user:
+        messages.error(request, "You do not have permission to remove members.")
+        return redirect('chatapp:dashboard_group_chat', group_id=group.id)
+
+    if request.method == 'POST':
+        form = RemoveGroupMemberForm(request.POST, user=request.user, group=group)
+        if form.is_valid():
+            members_to_remove = form.cleaned_data['members']
+            group.members.remove(*members_to_remove)
+            messages.success(request, f"Removed {len(members_to_remove)} member(s).")
+            return redirect('chatapp:dashboard_group_chat', group_id=group.id)
+    else:
+        form = RemoveGroupMemberForm(user=request.user, group=group)
+
+    context = {'form': form, 'group': group, 'title': 'Remove Members'}
+    return render(request, 'chatapp/edit_group.html', context)

@@ -42,7 +42,13 @@
     .contact-item.active {
         background-color: #e9ecef;
     }
+    /* Updated to handle clickable pic */
     .contact-item img, .contact-item .group-icon {
+        width: 48px;
+        height: 48px;
+        object-fit: cover;
+    }
+    .contact-item .profile-pic-clickable img {
         width: 48px;
         height: 48px;
         object-fit: cover;
@@ -76,8 +82,14 @@
         background-color: #ffffff;
         border-bottom: 1px solid #dee2e6;
     }
+    /* Updated to handle clickable pic */
     .chat-header img, .chat-header .group-icon {
         width: 40px;
+        height: 40px;
+        object-fit: cover;
+    }
+    .chat-header .profile-pic-clickable img {
+         width: 40px;
         height: 40px;
         object-fit: cover;
     }
@@ -99,7 +111,9 @@
     .message-bubble { max-width: 60%; padding: 0.5rem 0.75rem; border-radius: 12px; margin-bottom: 0.5rem; word-wrap: break-word; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05); }
     .message-bubble.sent { background-color: #dcf8c6; align-self: flex-end; border-bottom-right-radius: 4px; }
     .message-bubble.received { background-color: #ffffff; align-self: flex-start; border-bottom-left-radius: 4px; }
-    .message-time { font-size: 0.75rem; color: #6c757d; margin-top: 4px; text-align: right; }
+    .message-time { font-size: 0.75rem; color: #6c757d; margin-top: 4px; display: inline-block; }
+    .delete-msg-btn { font-size: 0.7rem; opacity: 0.6; }
+    .delete-msg-btn:hover { opacity: 1; }
     .chat-input { padding: 1rem; background-color: #f0f0f0; border-top: 1px solid #dee2e6; }
     .chat-input .form-control { border-radius: 20px; border: 1px solid #dee2e6; }
     .chat-input .btn { border-radius: 50%; width: 40px; height: 40px; }
@@ -112,6 +126,10 @@
 
     <div class="sidebar">
 
+        <div class="p-3 border-bottom">
+            <input type="text" class="form-control form-control-sm rounded-pill" 
+                   id="contact-search-input" placeholder="Search contacts and groups...">
+        </div>
         {% if incoming_requests %}
         <div class="p-3 border-bottom bg-light" id="contact-requests-list">
             <h6 class="fw-bold mb-2">Contact Requests</h6>
@@ -140,7 +158,11 @@
             {% for contact in contacts %}
             <a href="{% url 'chatapp:dashboard_chat' contact.user.id %}"
                 class="contact-item {% if selected_contact.user.id == contact.user.id %}active{% endif %}">
-                <img src="{{ contact.profile_picture.url }}" alt="Profile" class="rounded-circle">
+                
+                <div class="profile-pic-clickable">
+                    <img src="{{ contact.profile_picture.url }}" alt="Profile" class="rounded-circle">
+                </div>
+                
                 <div class="contact-info">
                     <h6 class="mb-0 fw-bold">{{ contact.display_name|default:contact.user.username }}</h6>
                     <small class="text-muted">@{{ contact.user.username }}</small>
@@ -175,50 +197,75 @@
 
     <div class="chat-area">
         {% if selected_contact %}
-        <div class="chat-header shadow-sm">
-            <img src="{{ selected_contact.profile_picture.url }}" alt="Profile" class="rounded-circle me-2">
-            <div>
-                <h6 class="mb-0 fw-bold">{{ selected_contact.display_name|default:selected_contact.user.username }}</h6>
-                <small class="text-muted">@{{ selected_contact.user.username }}</small>
+        <div class="chat-header shadow-sm d-flex justify-content-between align-items-center">
+             <div class="d-flex align-items-center">
+                <a href="#" class="profile-pic-clickable me-2">
+                    <img src="{{ selected_contact.profile_picture.url }}" alt="Profile" class="rounded-circle">
+                </a>
+                <div>
+                    <h6 class="mb-0 fw-bold">{{ selected_contact.display_name|default:selected_contact.user.username }}</h6>
+                    <small class="text-muted">@{{ selected_contact.user.username }}</small>
+                </div>
             </div>
         </div>
         
         {% elif selected_group %}
-        <div class="chat-header shadow-sm">
-            <div class="rounded-circle group-icon me-2">
-               {{ selected_group.name|first|upper }}
+        <div class="chat-header shadow-sm d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <div class="rounded-circle group-icon me-2">
+                   {{ selected_group.name|first|upper }}
+                </div>
+                <div>
+                    <h6 class="mb-0 fw-bold">{{ selected_group.name }}</h6>
+                    <small class="text-muted">{{ selected_group.members.count }} member{{ selected_group.members.count|pluralize }}</small>
+                </div>
             </div>
-            <div>
-                <h6 class="mb-0 fw-bold">{{ selected_group.name }}</h6>
-                <small class="text-muted">{{ selected_group.members.count }} member{{ selected_group.members.count|pluralize }}</small>
-            </div>
-        </div>
 
+            {% if selected_group.creator == user %}
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary rounded-circle" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                    style="width: 32px; height: 32px; padding: 0;">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'chatapp:edit_group' selected_group.id %}">Change Group Name</a></li>
+                    <li><a class="dropdown-item" href="{% url 'chatapp:add_group_members' selected_group.id %}">Add Members</a></li>
+                    <li><a class="dropdown-item" href="{% url 'chatapp:remove_group_members' selected_group.id %}">Remove Members</a></li>
+                </ul>
+            </div>
+            {% endif %}
+            </div>
         {% endif %}
 
 
         {% if selected_contact or selected_group %}
+        
         <div class="chat-messages" id="chat-messages">
             {% for message in messages %}
-            {% if message.sender == user %}
-            <div class="message-bubble sent">
-                <p class="mb-0">{{ message.content }}</p>
-                <div class="message-time">{{ message.timestamp|date:"h:i A" }}</div>
-            </div>
-            {% else %}
-            <div class="message-bubble received">
-                 {% if selected_group %}
-                <small class="fw-bold text-muted">{{ message.sender.username }}</small>
+            <div class="message-bubble {% if message.sender == user %}sent{% else %}received{% endif %}" data-message-id="{{ message.id }}">
+                
+                {% if message.is_deleted %}
+                    <p class="mb-0 fst-italic text-muted">{{ message.content }}</p>
+                {% else %}
+                    {% if selected_group and message.sender != user %}
+                        <small class="fw-bold text-muted">{{ message.sender.username }}</small>
+                    {% endif %}
+                    <p class="mb-0">{{ message.content }}</p>
+                    
+                    {% if message.sender == user %}
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1 float-end mt-1 delete-msg-btn" 
+                            title="Delete message">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                    {% endif %}
                 {% endif %}
-                <p class="mb-0">{{ message.content }}</p>
+                
                 <div class="message-time">{{ message.timestamp|date:"h:i A" }}</div>
             </div>
-            {% endif %}
             {% empty %}
             <p class="text-center text-muted">This is the beginning of your conversation.</p>
             {% endfor %}
         </div>
-
         <div class="chat-input">
             <form class="input-group" id="chat-form">
                 <input type="text" id="message-input" class="form-control"
@@ -230,7 +277,7 @@
         </div>
 
         {% else %}
-        <div classs="placeholder-area"
+        <div class="placeholder-area"
             style="display:flex; flex-grow:1; justify-content:center; align-items:center; text-align:center; color:#495057;">
             <div>
                 <i class="bi bi-chat-dots-fill" style="font-size: 5rem;"></i>
@@ -257,7 +304,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // 2. Get data from Django (set by the new view)
+        // 2. Get data from Django
         const chatType = "{{ chat_type|default:'' }}";
         const chatId = "{{ chat_id|default:'' }}";
         const currentUsername = "{{ user.username }}";
@@ -267,32 +314,44 @@
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             let wsUrl;
 
-            // --- THIS IS THE KEY LOGIC ---
-            // Decide which WebSocket URL to connect to
             if (chatType === '1on1') {
                 wsUrl = `${wsProtocol}//${window.location.host}/ws/chat/${chatId}/`;
             } else if (chatType === 'group') {
                 wsUrl = `${wsProtocol}//${window.location.host}/ws/group/${chatId}/`;
             }
-            // -----------------------------
 
             if (wsUrl) {
                 chatSocket = new WebSocket(wsUrl);
 
-                // Handle incoming messages
+                // --- UPDATED: Handle incoming messages (chat or delete) ---
                 chatSocket.onmessage = function (e) {
                     const data = JSON.parse(e.data);
-                    const isSent = (data.sender_username === currentUsername);
+                    
+                    if (data.type === 'chat_message') {
+                        // This is a new chat message
+                        const isSent = (data.sender_username === currentUsername);
+                        const bubble = createMessageBubble(
+                            data.content, 
+                            data.timestamp, 
+                            isSent,
+                            chatType === 'group' ? data.sender_username : null,
+                            data.message_id // <-- Pass message ID
+                        );
+                        chatMessages.appendChild(bubble);
 
-                    // Create the bubble and add it
-                    const bubble = createMessageBubble(
-                        data.content, 
-                        data.timestamp, 
-                        isSent,
-                        // Pass sender username for group chats
-                        chatType === 'group' ? data.sender_username : null
-                    );
-                    chatMessages.appendChild(bubble);
+                    } else if (data.type === 'message_deleted') {
+                        // A message was deleted
+                        const messageId = data.message_id;
+                        const bubble = document.querySelector(`.message-bubble[data-message-id='${messageId}']`);
+                        if (bubble) {
+                            // Replace its content
+                            bubble.innerHTML = `
+                                <p class="mb-0 fst-italic text-muted">This message was deleted.</p>
+                                <div class="message-time"></div>
+                            `;
+                        }
+                    }
+                    
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 };
 
@@ -301,7 +360,7 @@
                 };
                 chatSocket.onerror = function (e) {
                     console.error('WebSocket error:', e);
-G                };
+                };
             }
         }
 
@@ -314,19 +373,48 @@ G                };
                 if (message === '' || chatSocket === null) {
                     return;
                 }
-
+                
+                // --- UPDATED: Send as JSON object with type ---
                 chatSocket.send(JSON.stringify({
+                    'type': 'chat_message',
                     'message': message
                 }));
                 messageInput.value = '';
             });
         }
+        
+        // --- NEW: Handle clicking a delete button ---
+        if (chatMessages) {
+            chatMessages.addEventListener('click', function(e) {
+                // Find the closest delete button to the click
+                const deleteButton = e.target.closest('.delete-msg-btn');
+                
+                if (deleteButton) {
+                    e.preventDefault();
+                    // Find the parent message bubble
+                    const messageBubble = deleteButton.closest('.message-bubble');
+                    const messageId = messageBubble.dataset.messageId;
+                    
+                    if (confirm('Are you sure you want to delete this message?')) {
+                        if (chatSocket && messageId) {
+                            // Send a 'delete_message' command
+                            chatSocket.send(JSON.stringify({
+                                'type': 'delete_message',
+                                'message_id': messageId
+                            }));
+                        }
+                    }
+                }
+            });
+        }
 
-        // --- UPDATED HELPER FUNCTION ---
-        // Now accepts `senderUsername` to display in group chats
-        function createMessageBubble(content, timestamp, isSent, senderUsername = null) {
+
+        // --- UPDATED HELPER FUNCTION (for creating new bubbles) ---
+        // Now accepts `messageId` and adds a delete button
+        function createMessageBubble(content, timestamp, isSent, senderUsername = null, messageId) {
             const bubbleDiv = document.createElement('div');
             bubbleDiv.classList.add('message-bubble', isSent ? 'sent' : 'received');
+            bubbleDiv.dataset.messageId = messageId; // <-- Set the ID on the bubble
 
             // Add sender username for received group messages
             if (senderUsername && !isSent) {
@@ -339,18 +427,52 @@ G                };
             const contentP = document.createElement('p');
             contentP.classList.add('mb-0');
             contentP.textContent = content;
+            bubbleDiv.appendChild(contentP);
+            
+            // --- Add delete button if it's a sent message ---
+            if (isSent) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.classList.add('btn', 'btn-sm', 'btn-outline-danger', 'py-0', 'px-1', 'float-end', 'mt-1', 'delete-msg-btn');
+                deleteBtn.title = "Delete message";
+                deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+                bubbleDiv.appendChild(deleteBtn);
+            }
 
             const timeDiv = document.createElement('div');
             timeDiv.classList.add('message-time');
             timeDiv.textContent = timestamp;
-
-            bubbleDiv.appendChild(contentP);
             bubbleDiv.appendChild(timeDiv);
 
             return bubbleDiv;
         }
 
-        // --- (Your AJAX logic for contact requests can go here) ---
+        // --- NEW: Sidebar Search Filter Logic ---
+        const searchInput = document.getElementById('contact-search-input');
+        if (searchInput) {
+            searchInput.addEventListener('keyup', function() {
+                const filter = searchInput.value.toLowerCase();
+                
+                // Get all contact/group items
+                const items = document.querySelectorAll('.contact-list .contact-item');
+                
+                items.forEach(function(item) {
+                    // Find the text content to search within
+                    const nameElement = item.querySelector('.contact-info h6');
+                    const usernameElement = item.querySelector('.contact-info small');
+                    
+                    let text = '';
+                    if (nameElement) text += nameElement.textContent.toLowerCase();
+                    if (usernameElement) text += usernameElement.textContent.toLowerCase();
+                    
+                    if (text.includes(filter)) {
+                        item.style.display = 'flex'; // Show item
+                    } else {
+                        item.style.display = 'none'; // Hide item
+                    }
+                });
+            });
+        }
+
     });
 </script>
 {% endblock %}

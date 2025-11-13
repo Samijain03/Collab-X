@@ -175,16 +175,4 @@ MEDIA_ROOT = BASE_DIR / 'media'
 GOOGLE_GEMINI_API_KEY = os.getenv('GOOGLE_GEMINI_API_KEY')
 # --- END ADD ---
 
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.environ.get('CLOUD_NAME'),
-    'API_KEY': os.environ.get('API_KEY'),
-    'API_SECRET': os.environ.get('API_SECRET'),
-}
-
-# This will read the CLOUDINARY_URL you set
-import cloudinary
-cloudinary.config(
-  cloud_name = os.environ.get('CLOUD_NAME'),
-  api_key = os.environ.get('API_KEY'),
-  api_secret = os.environ.get('API_SECRET')
-)
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'

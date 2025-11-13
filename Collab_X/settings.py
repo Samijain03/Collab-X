@@ -167,12 +167,32 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 MEDIA_URL = '/media/'
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.environ.get('CLOUD_NAME'),
-    'API_KEY': os.environ.get('API_KEY'),
-    'API_SECRET': os.environ.get('API_SECRET'),
-}
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+# In settings.py
+
+# --- Backblaze B2 (Private Bucket) Media Storage ---
+
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+# Get credentials from Render environment variables
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+
+# This is the critical part for Backblaze
+AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL')
+
+# Ensure new files don't overwrite old ones
+AWS_S3_FILE_OVERWRITE = False
+
+# --- NEW CHANGES FOR PRIVATE BUCKET ---
+
+# 1. Files are private by default
+AWS_DEFAULT_ACL = None  # Use None for private
+
+# 2. We MUST use query string auth to generate temporary links
+AWS_QUERYSTRING_AUTH = True
+
+# --- End of B2 Config ---
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # --- ADD THIS ---

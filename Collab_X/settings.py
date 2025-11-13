@@ -55,8 +55,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'allauth.socialaccount.providers.google',
     'allauth.socialaccount.providers.microsoft',
-    'cloudinary',           
-    'cloudinary_storage',
 ]
 SITE_ID = 1
 

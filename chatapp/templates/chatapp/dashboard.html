@@ -1,6 +1,5 @@
 {% extends 'chatapp/base.html' %}
-
-{% block title %}Dashboard | Collab-X{% endblock %}
+{% load static %} {% block title %}Dashboard | Collab-X{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -42,7 +41,6 @@
     .contact-item.active {
         background-color: #e9ecef;
     }
-    /* Updated to handle clickable pic */
     .contact-item img, .contact-item .group-icon {
         width: 48px;
         height: 48px;
@@ -82,7 +80,6 @@
         background-color: #ffffff;
         border-bottom: 1px solid #dee2e6;
     }
-    /* Updated to handle clickable pic */
     .chat-header img, .chat-header .group-icon {
         width: 40px;
         height: 40px;
@@ -118,6 +115,69 @@
     .chat-input .form-control { border-radius: 20px; border: 1px solid #dee2e6; }
     .chat-input .btn { border-radius: 50%; width: 40px; height: 40px; }
     .placeholder-area { display: flex; flex-grow: 1; justify-content: center; align-items: center; text-align: center; color: #495057; }
+
+    /* --- UPDATED BOT STYLES --- */
+    .message-bubble.bot {
+        align-self: flex-start;
+        display: flex;
+        align-items: flex-end;
+        max-width: 70%;
+        padding: 0; /* Remove padding from main bubble */
+        background-color: transparent; /* Remove bg from main bubble */
+        border: none;
+        box-shadow: none;
+    }
+    .bot-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-right: 8px;
+        margin-bottom: 20px; /* Aligns with bottom of bubble */
+    }
+    .bot-content-wrapper {
+        padding: 0.5rem 0.75rem;
+        border-radius: 12px;
+        border-bottom-left-radius: 4px; /* like 'received' */
+        background-color: #f0e8ff; /* Light purple */
+        border: 1px solid #6f42c1;
+        white-space: pre-wrap;
+    }
+    .bot-content-wrapper .bot-header {
+        font-weight: bold;
+        color: #6f42c1; /* Purple */
+    }
+    /* --- END BOT STYLES --- */
+
+    /* --- JUMP-TO STYLES --- */
+    .message-bubble.bot .jump-btn {
+        font-size: 0.8rem;
+        font-weight: bold;
+        padding: 0.15rem 0.5rem;
+        margin-top: 0.5rem;
+        background-color: #6f42c1;
+        border-color: #6f42c1;
+        color: white;
+    }
+    .message-bubble.bot .jump-btn:hover {
+        background-color: #5a359a;
+    }
+    
+    .message-bubble.highlight {
+        animation: highlight-anim 2s ease-out;
+    }
+    @keyframes highlight-anim {
+        0% { background-color: #fcf8e3; }
+        100% { background-color: #dcf8c6; }
+    }
+    .message-bubble.received.highlight {
+        animation: highlight-anim-received 2s ease-out;
+    }
+    @keyframes highlight-anim-received {
+        0% { background-color: #fcf8e3; }
+        100% { background-color: #ffffff; }
+    }
+    /* --- END JUMP-TO STYLES --- */
 </style>
 {% endblock %}
 
@@ -134,7 +194,7 @@
         <div class="p-3 border-bottom bg-light" id="contact-requests-list">
             <h6 class="fw-bold mb-2">Contact Requests</h6>
             {% for request in incoming_requests %}
-            <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class.d-flex justify-content-between align-items-center mb-2">
                 <span class="fs-sm">{{ request.from_user.username }}</span>
                 <div>
                     <a href="{% url 'chatapp:accept_contact_request' request.id %}"
@@ -171,6 +231,16 @@
             {% empty %}
             <p class="p-3 text-muted">You have no contacts yet.</p>
             {% endfor %}
+
+            <a href="#" class="contact-item" style="cursor: not-allowed;" title="AI features are available in any chat with /Collab">
+                <div>
+                    <img src="{% static 'chatapp/images/bot_avatar.png' %}" alt="Bot" class="rounded-circle">
+                </div>
+                <div class="contact-info">
+                    <h6 class="mb-0 fw-bold">Collab-X Bot</h6>
+                    <small class="text-muted">@bot (Available via /Collab)</small>
+                </div>
+            </a>
             
             <div class="sidebar-header d-flex justify-content-between align-items-center mt-3">
                 <h5 class="fw-bold mb-0">Groups</h5>
@@ -211,7 +281,7 @@
         
         {% elif selected_group %}
         <div class="chat-header shadow-sm d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
+            <div class="d-flex align-items:center">
                 <div class="rounded-circle group-icon me-2">
                    {{ selected_group.name|first|upper }}
                 </div>
@@ -269,7 +339,7 @@
         <div class="chat-input">
             <form class="input-group" id="chat-form">
                 <input type="text" id="message-input" class="form-control"
-                    placeholder="Type a message..." required>
+                    placeholder="Type a message... (e.g. /Collab hidden)" required>
                 <button class="btn btn-primary ms-2" type="submit">
                     <i class="bi bi-send-fill"></i>
                 </button>
@@ -299,17 +369,14 @@
         
         let chatSocket = null;
 
-        // 1. Scroll to the bottom on load
         if (chatMessages) {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // 2. Get data from Django
         const chatType = "{{ chat_type|default:'' }}";
         const chatId = "{{ chat_id|default:'' }}";
         const currentUsername = "{{ user.username }}";
 
-        // 3. Connect to WebSocket only if a chat is selected
         if (chatType && chatId) {
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             let wsUrl;
@@ -323,81 +390,113 @@
             if (wsUrl) {
                 chatSocket = new WebSocket(wsUrl);
 
-                // --- UPDATED: Handle incoming messages (chat or delete) ---
+                // --- FULLY UPDATED 'onmessage' HANDLER ---
                 chatSocket.onmessage = function (e) {
                     const data = JSON.parse(e.data);
                     
                     if (data.type === 'chat_message') {
-                        // This is a new chat message
                         const isSent = (data.sender_username === currentUsername);
                         const bubble = createMessageBubble(
                             data.content, 
                             data.timestamp, 
                             isSent,
                             chatType === 'group' ? data.sender_username : null,
-                            data.message_id // <-- Pass message ID
+                            data.message_id 
                         );
                         chatMessages.appendChild(bubble);
 
                     } else if (data.type === 'message_deleted') {
-                        // A message was deleted
                         const messageId = data.message_id;
                         const bubble = document.querySelector(`.message-bubble[data-message-id='${messageId}']`);
                         if (bubble) {
-                            // Replace its content
                             bubble.innerHTML = `
                                 <p class="mb-0 fst-italic text-muted">This message was deleted.</p>
                                 <div class="message-time"></div>
                             `;
+                        }
+                    
+                    } else if (data.type === 'bot_message') {
+                        if (data.status === 'thinking') {
+                            // Create the "Thinking..." bubble
+                            const bubble = createBotMessageBubble(
+                                data.content, 
+                                data.sender_username,
+                                null, // No jump_id yet
+                                data.request_id
+                            );
+                            chatMessages.appendChild(bubble);
+                        
+                        } else if (data.status === 'complete') {
+                            // Find the "Thinking..." bubble
+                            const existingBubble = document.getElementById(`bot-response-${data.request_id}`);
+                            
+                            if (existingBubble) {
+                                // Update the content
+                                const contentP = existingBubble.querySelector(`#bot-content-${data.request_id}`);
+                                if (contentP) contentP.textContent = data.content;
+                                
+                                // Add jump button if it exists
+                                if (data.jump_id) {
+                                    const jumpContainer = existingBubble.querySelector(`#bot-jump-${data.request_id}`);
+                                    if (jumpContainer) {
+                                        // Clear any old content (like "Thinking...")
+                                        jumpContainer.innerHTML = '';
+                                        const jumpBtn = document.createElement('button');
+                                        jumpBtn.classList.add('btn', 'btn-primary', 'jump-btn');
+                                        jumpBtn.textContent = 'Jump to message';
+                                        jumpBtn.dataset.jumpId = data.jump_id;
+                                        jumpContainer.appendChild(jumpBtn);
+                                    }
+                                }
+                            } else {
+                                // Fallback: create a new bubble
+                                const bubble = createBotMessageBubble(
+                                    data.content, 
+                                    data.sender_username,
+                                    data.jump_id,
+                                    data.request_id
+                                );
+                                chatMessages.appendChild(bubble);
+                            }
                         }
                     }
                     
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 };
 
-                chatSocket.onclose = function (e) {
-                    console.error('Chat socket closed unexpectedly', e);
-                };
-                chatSocket.onerror = function (e) {
-                    console.error('WebSocket error:', e);
-                };
+                chatSocket.onclose = function (e) { console.error('Chat socket closed unexpectedly', e); };
+                chatSocket.onerror = function (e) { console.error('WebSocket error:', e); };
             }
         }
 
-        // 7. Handle form submission (Send message)
         if (chatForm) {
+            // --- UPDATED 'submit' HANDLER ---
             chatForm.addEventListener('submit', function (e) {
                 e.preventDefault();
                 const message = messageInput.value.trim();
+                if (message === '' || chatSocket === null) { return; }
                 
-                if (message === '' || chatSocket === null) {
-                    return;
-                }
-                
-                // --- UPDATED: Send as JSON object with type ---
                 chatSocket.send(JSON.stringify({
                     'type': 'chat_message',
                     'message': message
                 }));
                 messageInput.value = '';
+                // We no longer show a temporary "Sending..." message
             });
         }
         
-        // --- NEW: Handle clicking a delete button ---
         if (chatMessages) {
             chatMessages.addEventListener('click', function(e) {
-                // Find the closest delete button to the click
-                const deleteButton = e.target.closest('.delete-msg-btn');
                 
+                // Handle Delete Button
+                const deleteButton = e.target.closest('.delete-msg-btn');
                 if (deleteButton) {
                     e.preventDefault();
-                    // Find the parent message bubble
                     const messageBubble = deleteButton.closest('.message-bubble');
                     const messageId = messageBubble.dataset.messageId;
                     
                     if (confirm('Are you sure you want to delete this message?')) {
                         if (chatSocket && messageId) {
-                            // Send a 'delete_message' command
                             chatSocket.send(JSON.stringify({
                                 'type': 'delete_message',
                                 'message_id': messageId
@@ -405,18 +504,34 @@
                         }
                     }
                 }
+                
+                // Handle Jump Button
+                const jumpButton = e.target.closest('.jump-btn');
+                if (jumpButton) {
+                    e.preventDefault();
+                    const jumpId = jumpButton.dataset.jumpId;
+                    const targetMessage = document.querySelector(`.message-bubble[data-message-id='${jumpId}']`);
+                    
+                    if (targetMessage) {
+                        targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetMessage.classList.add('highlight');
+                        setTimeout(() => {
+                            targetMessage.classList.remove('highlight');
+                        }, 2000); 
+                    } else {
+                        alert("Can't find that message (it may be from an older conversation).");
+                    }
+                }
             });
         }
 
 
-        // --- UPDATED HELPER FUNCTION (for creating new bubbles) ---
-        // Now accepts `messageId` and adds a delete button
+        // --- createMessageBubble (unchanged) ---
         function createMessageBubble(content, timestamp, isSent, senderUsername = null, messageId) {
             const bubbleDiv = document.createElement('div');
             bubbleDiv.classList.add('message-bubble', isSent ? 'sent' : 'received');
-            bubbleDiv.dataset.messageId = messageId; // <-- Set the ID on the bubble
+            bubbleDiv.dataset.messageId = messageId; 
 
-            // Add sender username for received group messages
             if (senderUsername && !isSent) {
                 const senderP = document.createElement('small');
                 senderP.classList.add('fw-bold', 'text-muted');
@@ -429,7 +544,6 @@
             contentP.textContent = content;
             bubbleDiv.appendChild(contentP);
             
-            // --- Add delete button if it's a sent message ---
             if (isSent) {
                 const deleteBtn = document.createElement('button');
                 deleteBtn.classList.add('btn', 'btn-sm', 'btn-outline-danger', 'py-0', 'px-1', 'float-end', 'mt-1', 'delete-msg-btn');
@@ -446,33 +560,75 @@
             return bubbleDiv;
         }
 
-        // --- NEW: Sidebar Search Filter Logic ---
+        // --- UPDATED `createBotMessageBubble` HELPER ---
+        function createBotMessageBubble(content, senderUsername, jumpId, requestId) {
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('message-bubble', 'bot');
+            bubbleDiv.id = `bot-response-${requestId}`; // Set ID on main bubble
+            
+            // 1. Bot Avatar
+            const avatarImg = document.createElement('img');
+            avatarImg.classList.add('bot-avatar');
+            // This path is rendered by Django
+            avatarImg.src = "{% static 'chatapp/images/bot_avatar.png' %}"; 
+            avatarImg.alt = "Bot";
+            bubbleDiv.appendChild(avatarImg);
+
+            // 2. Content Wrapper
+            const contentWrapper = document.createElement('div');
+            contentWrapper.classList.add('bot-content-wrapper');
+
+            // 3. Bot Header
+            const senderP = document.createElement('small');
+            senderP.classList.add('bot-header');
+            senderP.textContent = `🤖 ${senderUsername}`;
+            contentWrapper.appendChild(senderP);
+
+            // 4. Content
+            const contentP = document.createElement('p');
+            contentP.classList.add('mb-0', 'mt-1');
+            contentP.id = `bot-content-${requestId}`; // ID for content
+            contentP.textContent = content; 
+            contentWrapper.appendChild(contentP);
+            
+            // 5. Jump Button Container
+            const jumpBtnContainer = document.createElement('div');
+            jumpBtnContainer.id = `bot-jump-${requestId}`;
+            if (jumpId) {
+                const jumpBtn = document.createElement('button');
+                jumpBtn.classList.add('btn', 'btn-primary', 'jump-btn');
+                jumpBtn.textContent = 'Jump to message';
+                jumpBtn.dataset.jumpId = jumpId;
+                jumpBtnContainer.appendChild(jumpBtn);
+            }
+            contentWrapper.appendChild(jumpBtnContainer);
+            
+            bubbleDiv.appendChild(contentWrapper);
+            return bubbleDiv;
+        }
+        // --- END OF UPDATED HELPER ---
+
+        // --- Sidebar Search Filter Logic (unchanged) ---
         const searchInput = document.getElementById('contact-search-input');
         if (searchInput) {
             searchInput.addEventListener('keyup', function() {
                 const filter = searchInput.value.toLowerCase();
-                
-                // Get all contact/group items
                 const items = document.querySelectorAll('.contact-list .contact-item');
-                
                 items.forEach(function(item) {
-                    // Find the text content to search within
                     const nameElement = item.querySelector('.contact-info h6');
                     const usernameElement = item.querySelector('.contact-info small');
-                    
                     let text = '';
                     if (nameElement) text += nameElement.textContent.toLowerCase();
                     if (usernameElement) text += usernameElement.textContent.toLowerCase();
                     
                     if (text.includes(filter)) {
-                        item.style.display = 'flex'; // Show item
+                        item.style.display = 'flex'; 
                     } else {
-                        item.style.display = 'none'; // Hide item
+                        item.style.display = 'none'; 
                     }
                 });
             });
         }
-
     });
 </script>
 {% endblock %}

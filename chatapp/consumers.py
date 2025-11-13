@@ -1,172 +1,248 @@
 # chatapp/consumers.py
 
 import json
+import re
+import time # <-- ADD THIS
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
-# --- UPDATED IMPORTS ---
+from django.db.models import Q
+
 from .models import Message, Profile, Group, GroupMessage
+from .gemini_utils import format_chat_history, get_collab_response
+
+def parse_bot_response(response_text):
+    """
+    Parses the AI response to find a [jump_to: ID] tag.
+    Returns the clean content and the jump_id.
+    """
+    jump_id = None
+    content = response_text
+    
+    match = re.search(r'\[jump_to:\s*(\d+)\s*\]$', response_text)
+    
+    if match:
+        jump_id = int(match.group(1))
+        content = re.sub(r'\[jump_to:\s*(\d+)\s*\]$', '', response_text).strip()
+        
+    return content, jump_id
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
     
+    # ... connect ...
     async def connect(self):
         try:
-            # 1. Get user and contact_id from the URL
             self.user = self.scope['user']
             self.contact_id = self.scope['url_route']['kwargs']['contact_id']
-            
-            # 2. Check if user is authenticated
             if not self.user.is_authenticated:
-                print(f"[WebSocket] REJECT: User is not authenticated.")
                 await self.close()
                 return
-                
-            print(f"[WebSocket] INFO: User '{self.user.username}' attempting to connect to chat with user_id '{self.contact_id}'.")
-
-            # 3. Get the contact user object
             self.contact_user = await self.get_user(self.contact_id)
-            
-            # 4. Get profiles
             self.contact_profile = await self.get_profile(self.contact_user)
             self.user_profile = await self.get_profile(self.user)
-            
-            # 5. Security Check: Ensure they are contacts
             are_contacts = await self.check_contacts(self.user_profile, self.contact_user)
             if not are_contacts:
-                print(f"[WebSocket] REJECT: User '{self.user.username}' and '{self.contact_user.username}' are not contacts.")
                 await self.close()
                 return
-
         except User.DoesNotExist:
-            print(f"[WebSocket] ERROR: User with id={self.contact_id} does not exist.")
             await self.close()
             return
         except Profile.DoesNotExist:
-            print(f"[WebSocket] ERROR: A Profile is missing for user '{self.user.username}' or contact '{self.contact_user.username}'.")
             await self.close()
             return
         except Exception as e:
-            print(f"[WebSocket] ERROR: An unexpected error occurred: {e}")
+            print(f"[WebSocket] ERROR: {e}")
             await self.close()
             return
-            
-        # 6. Create a unique, private room name for the pair
         user_ids = sorted([self.user.id, self.contact_user.id])
         self.room_group_name = f'chat_{user_ids[0]}_{user_ids[1]}'
-
-        # 7. Join the room
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
-
-        # 8. Accept the connection
-        print(f"[WebSocket] ACCEPT: Connection accepted for '{self.user.username}' to room '{self.room_group_name}'.")
         await self.accept()
 
-
+    # ... disconnect ...
     async def disconnect(self, close_code):
-        # Leave the room
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(
                 self.room_group_name,
                 self.channel_name
             )
 
-    # Receive message from WebSocket (frontend JavaScript)
+    # --- UPDATED `receive` METHOD ---
     async def receive(self, text_data):
         data = json.loads(text_data)
-        message_type = data.get('type', 'chat_message') # Default to chat_message
+        message_type = data.get('type', 'chat_message') 
 
         if message_type == 'chat_message':
             message_content = data['message']
             if not message_content.strip():
-                return # Don't send empty messages
+                return 
 
-            # 1. Save the new message to the database
+            # --- UPDATED BOT CHECK ---
+            if message_content.startswith('/Collab'):
+                is_hidden = message_content.startswith('/Collab hidden')
+                await self.handle_collab_command(message_content, is_hidden)
+                return
+            # --- END BOT CHECK ---
+
             new_message = await self.save_message(
                 sender=self.user,
                 receiver=self.contact_user,
                 content=message_content
             )
-
-            # 2. Broadcast the message to the room
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'chat_message', # This calls the 'chat_message' method
-                    'message_id': new_message.id, # <-- Send ID
+                    'type': 'chat_message', 
+                    'message_id': new_message.id, 
                     'message': new_message.content,
                     'sender_username': self.user.username,
-                    'timestamp': new_message.timestamp.strftime("%I:%M %p") # 12-hr format
+                    'timestamp': new_message.timestamp.strftime("%I:%M %p") 
                 }
             )
         
         elif message_type == 'delete_message':
             message_id = data['message_id']
-            # Delete the message (marks as deleted, checks sender)
             deleted_message = await self.delete_message(message_id)
             
             if deleted_message:
-                # Broadcast that the message was deleted
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {
-                        'type': 'message_deleted', # This calls 'message_deleted'
+                        'type': 'message_deleted', 
                         'message_id': deleted_message.id,
                     }
                 )
 
-    # Receive message from room group (broadcast)
+    # ... chat_message (unchanged) ...
     async def chat_message(self, event):
-        # This method is called when a 'chat_message' type is broadcast
-        
-        # Send message data to the WebSocket (client)
         await self.send(text_data=json.dumps({
-            'type': 'chat_message', # <-- Send type
-            'message_id': event['message_id'], # <-- Send ID
+            'type': 'chat_message', 
+            'message_id': event['message_id'], 
             'content': event['message'],
             'sender_username': event['sender_username'],
             'timestamp': event['timestamp'],
         }))
 
-    # --- ADD THIS NEW HANDLER ---
-    # Receive delete confirmation from room group (broadcast)
+    # ... message_deleted (unchanged) ...
     async def message_deleted(self, event):
-        # This method is called when a 'message_deleted' type is broadcast
         await self.send(text_data=json.dumps({
             'type': 'message_deleted',
             'message_id': event['message_id'],
         }))
 
-    # --- DATABASE HELPER FUNCTIONS ---
-    
+    # --- NEW `handle_collab_command` ---
+    async def handle_collab_command(self, command_text, is_hidden):
+        # Generate a unique ID for this request
+        request_id = f"bot-{self.user.id}-{int(time.time())}"
+        
+        # 1. Send "Thinking..." message
+        thinking_payload_js = {
+            'type': 'bot_message',
+            'status': 'thinking',
+            'content': "Thinking...",
+            'sender_username': 'Collab-X',
+            'jump_id': None,
+            'request_id': request_id
+        }
+        
+        if is_hidden:
+            # Send "Thinking..." only to the user
+            await self.send(text_data=json.dumps(thinking_payload_js))
+        else:
+            # Broadcast "Thinking..." to the group
+            await self.channel_layer.group_send(self.room_group_name, {
+                'type': 'bot_message', # This is the handler name
+                'status': 'thinking',
+                'message': "Thinking...",
+                'sender_username': 'Collab-X',
+                'jump_id': None,
+                'request_id': request_id
+            })
+        
+        # 2. Extract user's actual query
+        if is_hidden:
+            user_query = command_text.replace('/Collab hidden', '').strip()
+        else:
+            user_query = command_text.replace('/Collab', '').strip()
+        if not user_query:
+            user_query = "Summarize our chat so far."
+            
+        # 3. Get chat history
+        chat_history_string = await self.get_chat_history()
+        
+        # 4. Call Gemini (wrapped)
+        bot_response_text = await database_sync_to_async(get_collab_response)(
+            chat_history_string, 
+            user_query
+        )
+        clean_content, jump_id = parse_bot_response(bot_response_text)
+        
+        # 5. Send the final response
+        final_payload_js = {
+            'type': 'bot_message',
+            'status': 'complete',
+            'content': clean_content,
+            'sender_username': 'Collab-X',
+            'jump_id': jump_id,
+            'request_id': request_id # Use same ID
+        }
+
+        if is_hidden:
+            # Send final response only to the user
+            await self.send(text_data=json.dumps(final_payload_js))
+        else:
+            # Broadcast final response to the group
+            await self.channel_layer.group_send(self.room_group_name, {
+                'type': 'bot_message', # Handler name
+                'status': 'complete',
+                'message': clean_content,
+                'sender_username': 'Collab-X',
+                'jump_id': jump_id,
+                'request_id': request_id
+            })
+
+    # --- UPDATED `bot_message` HANDLER ---
+    async def bot_message(self, event):
+        """ Handles broadcasting 'bot_message' types from the group. """
+        await self.send(text_data=json.dumps({
+            'type': 'bot_message', # Type for JS client
+            'status': event.get('status', 'complete'),
+            'content': event['message'], # Content is in 'message'
+            'sender_username': event['sender_username'],
+            'jump_id': event.get('jump_id', None),
+            'request_id': event.get('request_id')
+        }))
+        
+    # ... get_chat_history (unchanged) ...
+    @database_sync_to_async
+    def get_chat_history(self):
+        messages_queryset = Message.objects.filter(
+            (Q(sender=self.user) & Q(receiver=self.contact_user)) |
+            (Q(sender=self.contact_user) & Q(receiver=self.user)),
+            is_deleted=False
+        ).order_by('timestamp')
+        return format_chat_history(messages_queryset)
+
+    # ... Other DB helpers (get_user, get_profile, etc. are unchanged) ...
     @database_sync_to_async
     def get_user(self, user_id):
         return User.objects.get(id=user_id)
-
     @database_sync_to_async
     def get_profile(self, user):
         return Profile.objects.get(user=user)
-
     @database_sync_to_async
     def check_contacts(self, user_profile, contact_user):
         return user_profile.contacts.filter(user=contact_user).exists()
-
     @database_sync_to_async
     def save_message(self, sender, receiver, content):
-        return Message.objects.create(
-            sender=sender,
-            receiver=receiver,
-            content=content
-        )
-        
-    # --- ADD THIS NEW DB HELPER ---
+        return Message.objects.create(sender=sender, receiver=receiver, content=content)
     @database_sync_to_async
     def delete_message(self, message_id):
-        """Finds a message, checks ownership, and marks it as deleted."""
         try:
-            # Security: Only the sender can delete their own message
             msg = Message.objects.get(id=message_id, sender=self.user)
             if not msg.is_deleted:
                 msg.is_deleted = True
@@ -178,53 +254,38 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return None
 
 
-# --- UPDATED CLASS FOR GROUP CHAT (with delete) ---
+# --- UPDATES FOR GroupChatConsumer ---
 
 class GroupChatConsumer(AsyncWebsocketConsumer):
     
+    # ... connect (unchanged) ...
     async def connect(self):
         try:
             self.user = self.scope['user']
             self.group_id = self.scope['url_route']['kwargs']['group_id']
-
             if not self.user.is_authenticated:
-                print("[WebSocket] REJECT: User is not authenticated.")
                 await self.close()
                 return
-
-            print(f"[WebSocket] INFO: User '{self.user.username}' attempting to connect to group '{self.group_id}'.")
-
-            # Get the group and check if the user is a member
             self.group = await self.get_group(self.group_id)
             is_member = await self.check_membership(self.group, self.user)
-
             if not is_member:
-                print(f"[WebSocket] REJECT: User '{self.user.username}' is not a member of group '{self.group_id}'.")
                 await self.close()
                 return
-        
         except Group.DoesNotExist:
-            print(f"[WebSocket] ERROR: Group with id={self.group_id} does not exist.")
             await self.close()
             return
         except Exception as e:
-            print(f"[WebSocket] ERROR: An unexpected error occurred: {e}")
+            print(f"[WebSocket] ERROR: {e}")
             await self.close()
             return
-
-        # Set the room name
         self.room_group_name = f'group_{self.group_id}'
-
-        # Join the room
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
-
-        # Accept the connection
-        print(f"[WebSocket] ACCEPT: Connection accepted for '{self.user.username}' to room '{self.room_group_name}'.")
         await self.accept()
 
+    # ... disconnect (unchanged) ...
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(
@@ -232,7 +293,7 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
 
-    # Receive message from WebSocket
+    # --- UPDATED `receive` METHOD ---
     async def receive(self, text_data):
         data = json.loads(text_data)
         message_type = data.get('type', 'chat_message')
@@ -241,20 +302,24 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             message_content = data['message']
             if not message_content.strip():
                 return
+            
+            # --- UPDATED BOT CHECK ---
+            if message_content.startswith('/Collab'):
+                is_hidden = message_content.startswith('/Collab hidden')
+                await self.handle_collab_command(message_content, is_hidden)
+                return
+            # --- END BOT CHECK ---
 
-            # Save the new group message
             new_message = await self.save_group_message(
                 group=self.group,
                 sender=self.user,
                 content=message_content
             )
-
-            # Broadcast the message to the room
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'group_chat_message',
-                    'message_id': new_message.id, # <-- Send ID
+                    'message_id': new_message.id, 
                     'message': new_message.content,
                     'sender_username': self.user.username,
                     'timestamp': new_message.timestamp.strftime("%I:%M %p")
@@ -269,51 +334,119 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {
-                        'type': 'message_deleted', # Calls 'message_deleted'
+                        'type': 'message_deleted',
                         'message_id': deleted_message.id,
                     }
                 )
 
-    # Receive message from room group
+    # ... group_chat_message (unchanged) ...
     async def group_chat_message(self, event):
         await self.send(text_data=json.dumps({
-            'type': 'chat_message', # <-- Send type
-            'message_id': event['message_id'], # <-- Send ID
+            'type': 'chat_message', 
+            'message_id': event['message_id'], 
             'content': event['message'],
             'sender_username': event['sender_username'],
             'timestamp': event['timestamp'],
         }))
         
-    # --- ADD THIS NEW HANDLER ---
+    # ... message_deleted (unchanged) ...
     async def message_deleted(self, event):
         await self.send(text_data=json.dumps({
             'type': 'message_deleted',
             'message_id': event['message_id'],
         }))
 
-    # --- Database Helpers for Group ---
+    # --- NEW `handle_collab_command` ---
+    async def handle_collab_command(self, command_text, is_hidden):
+        request_id = f"bot-{self.user.id}-{int(time.time())}"
+        
+        thinking_payload_js = {
+            'type': 'bot_message',
+            'status': 'thinking',
+            'content': "Thinking...",
+            'sender_username': 'Collab-X',
+            'jump_id': None,
+            'request_id': request_id
+        }
+        
+        if is_hidden:
+            await self.send(text_data=json.dumps(thinking_payload_js))
+        else:
+            await self.channel_layer.group_send(self.room_group_name, {
+                'type': 'bot_message',
+                'status': 'thinking',
+                'message': "Thinking...",
+                'sender_username': 'Collab-X',
+                'jump_id': None,
+                'request_id': request_id
+            })
+        
+        if is_hidden:
+            user_query = command_text.replace('/Collab hidden', '').strip()
+        else:
+            user_query = command_text.replace('/Collab', '').strip()
+        if not user_query:
+            user_query = "Summarize this group chat so far."
+            
+        chat_history_string = await self.get_chat_history()
+        
+        bot_response_text = await database_sync_to_async(get_collab_response)(
+            chat_history_string, 
+            user_query
+        )
+        clean_content, jump_id = parse_bot_response(bot_response_text)
+        
+        final_payload_js = {
+            'type': 'bot_message',
+            'status': 'complete',
+            'content': clean_content,
+            'sender_username': 'Collab-X',
+            'jump_id': jump_id,
+            'request_id': request_id
+        }
+
+        if is_hidden:
+            await self.send(text_data=json.dumps(final_payload_js))
+        else:
+            await self.channel_layer.group_send(self.room_group_name, {
+                'type': 'bot_message',
+                'status': 'complete',
+                'message': clean_content,
+                'sender_username': 'Collab-X',
+                'jump_id': jump_id,
+                'request_id': request_id
+            })
+
+    # --- UPDATED `bot_message` HANDLER ---
+    async def bot_message(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'bot_message',
+            'status': event.get('status', 'complete'),
+            'content': event['message'],
+            'sender_username': event['sender_username'],
+            'jump_id': event.get('jump_id', None),
+            'request_id': event.get('request_id')
+        }))
+        
+    # ... get_chat_history (unchanged) ...
+    @database_sync_to_async
+    def get_chat_history(self):
+        messages_queryset = self.group.messages.filter(is_deleted=False).order_by('timestamp')
+        return format_chat_history(messages_queryset)
+
+    # ... Other DB helpers (get_group, etc. are unchanged) ...
     @database_sync_to_async
     def get_group(self, group_id):
         return Group.objects.get(id=group_id)
-
     @database_sync_to_async
     def check_membership(self, group, user):
         return group.members.filter(id=user.id).exists()
-
     @database_sync_to_async
     def save_group_message(self, group, sender, content):
-        return GroupMessage.objects.create(
-            group=group,
-            sender=sender,
-            content=content
-        )
-
-    # --- ADD THIS NEW DB HELPER ---
+        return GroupMessage.objects.create(group=group, sender=sender, content=content)
     @database_sync_to_async
     def delete_group_message(self, message_id):
-        """Finds a group message, checks ownership, and marks it as deleted."""
         try:
-            # Security: Only the sender can delete their own message
             msg = GroupMessage.objects.get(id=message_id, sender=self.user)
             if not msg.is_deleted:
                 msg.is_deleted = True

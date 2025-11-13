@@ -11,9 +11,16 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os  # <-- ADD THIS
+from dotenv import load_dotenv  # <-- ADD THIS
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# --- ADD THIS ---
+# Load environment variables from .env file
+load_dotenv(BASE_DIR / '.env')
+# --- END ADD ---
 
 
 # Quick-start development settings - unsuitable for production
@@ -156,3 +163,8 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# --- ADD THIS ---
+# Gemini API Key (loaded from .env)
+GOOGLE_GEMINI_API_KEY = os.getenv('GOOGLE_GEMINI_API_KEY')
+# --- END ADD ---

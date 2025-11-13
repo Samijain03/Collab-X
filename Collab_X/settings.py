@@ -33,7 +33,7 @@ SECRET_KEY = 'django-insecure-zik7rk)ip_ghw()=3ek)nd6he&k*fnj%y5%xhn7u*7*zj$1k!%
 DEBUG = False
 
 ALLOWED_HOSTS = [os.environ.get('ALLOWED_HOSTS')]
-
+CSRF_TRUSTED_ORIGINS = [f"https://{os.environ.get('ALLOWED_HOSTS')}"]
 
 # Application definition
 

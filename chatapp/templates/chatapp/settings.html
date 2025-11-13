@@ -2,92 +2,258 @@
 
 {% block title %}Account Settings | Collab-X{% endblock %}
 
-{% block content %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
-            <div class="card shadow-sm">
-                <div class="card-body p-4">
-                    <h2 class="card-title text-center fw-bold mb-4">Account Settings</h2>
-
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-success" role="alert">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                    
-                    <!-- <div class="text-center mb-4">
-                        <img src="{{ user.profile.profile_picture.url }}" alt="Profile Picture" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;">
-                        <h5 class="mt-2">{{ user.username }}</h5>
-                    </div> -->
-
-                    <form method="POST" enctype="multipart/form-data" id="profile-form">
-                        {% csrf_token %}
-                        
-                        <div class="text-center mb-4">
-                            <label for="{{ form.profile_picture.id_for_label }}" class="profile-picture-container">
-                                <img id="profile-pic-preview" src="{{ user.profile.profile_picture.url }}" alt="Profile Picture" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;">
-                                <div class="profile-picture-overlay">
-                                    <i class="bi bi-camera fs-3"></i>
-                                    <p class="mb-0 small">CHANGE</p>
-                                </div>
-                            </label>
-                            <h5 class="mt-2">{{ user.username }}</h5>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Display Name</label>
-                            {{ form.display_name }}
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">About Me</label>
-                            {{ form.about_me }}
-                        </div>
-
-                            {{ form.profile_picture }}
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary fw-bold">Save Changes</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-
+{% block extra_head %}
 <style>
+    .auth-container {
+        min-height: calc(100vh - 56px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+        background: var(--dark-bg);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .auth-card {
+        width: 100%;
+        max-width: 550px;
+        background: var(--card-bg);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 60px rgba(0, 255, 159, 0.2);
+        overflow: hidden;
+        animation: slideUp 0.5s ease-out;
+        border: 1px solid var(--border-color);
+        position: relative;
+        z-index: 1;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .auth-header {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        color: var(--darker-bg);
+        padding: 2.5rem 2rem;
+        text-align: center;
+        position: relative;
+    }
+
+    .auth-header h2 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 2rem;
+        font-family: 'Fira Code', monospace;
+    }
+
+    .auth-header p {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+        font-size: 0.95rem;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .auth-body {
+        padding: 2.5rem 2rem;
+    }
+
+    .auth-btn {
+        width: 100%;
+        padding: 1rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 0.75rem;
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        border: none;
+        color: var(--darker-bg);
+        transition: var(--transition);
+        box-shadow: 0 4px 12px rgba(0, 255, 159, 0.3);
+        font-family: 'Fira Code', monospace;
+    }
+
+    .auth-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-neon);
+    }
+    
+    /* Profile Pic Uploader Styles */
     .profile-picture-container {
-        position: relative; /* Needed for the overlay */
+        position: relative;
         display: inline-block;
         cursor: pointer;
     }
+
+    #profile-pic-preview {
+        width: 120px; 
+        height: 120px; 
+        object-fit: cover;
+        border-radius: 50%;
+        border: 3px solid var(--primary-color);
+        box-shadow: 0 0 10px rgba(0, 255, 159, 0.3);
+        transition: var(--transition);
+    }
+
+    .profile-picture-container:hover #profile-pic-preview {
+        box-shadow: var(--shadow-neon);
+        transform: scale(1.05);
+    }
+
     .profile-picture-overlay {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+        background-color: rgba(1, 4, 9, 0.7);
         color: white;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         border-radius: 50%;
-        opacity: 0; /* Hidden by default */
-        transition: opacity 0.3s ease; /* Smooth fade-in effect */
+        opacity: 0;
+        transition: opacity 0.3s ease;
         font-weight: bold;
     }
+
     .profile-picture-container:hover .profile-picture-overlay {
-        opacity: 1; /* Show on hover */
+        opacity: 1;
+    }
+
+    /* Hide the actual file input */
+    #{{ form.profile_picture.id_for_label }} {
+        display: none;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-family: 'JetBrains Mono', monospace;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Form control styling for settings page */
+    .auth-body input[type="text"],
+    .auth-body textarea {
+        width: 100%;
+        border-radius: 0.75rem !important;
+        border: 2px solid var(--border-color) !important;
+        padding: 0.75rem 1rem !important;
+        background-color: var(--darker-bg) !important;
+        color: var(--text-primary) !important;
+        font-family: 'JetBrains Mono', monospace;
+        transition: var(--transition);
+    }
+
+    .auth-body input[type="text"]:focus,
+    .auth-body textarea:focus {
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 0.25rem rgba(0, 255, 159, 0.25) !important;
+        background-color: var(--darker-bg) !important;
+        outline: none !important;
+    }
+
+    .auth-body textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    /* Alert styling */
+    .alert-success {
+        background-color: rgba(0, 255, 159, 0.1);
+        border-left: 4px solid var(--primary-color);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        color: var(--text-primary);
+        border: 1px solid var(--primary-color);
+    }
+
+    .mb-3 {
+        margin-bottom: 1.5rem;
+    }
+
+    .d-grid {
+        display: grid;
+    }
+
+    .mt-4 {
+        margin-top: 1.5rem;
+    }
+
+    .mt-3 {
+        margin-top: 1rem;
     }
 </style>
+{% endblock %}
 
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2><i class="bi bi-gear-fill me-2"></i>$ ./configure</h2>
+            <p>// Manage your account settings</p>
+        </div>
+
+        <div class="auth-body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-success" role="alert">
+                        <i class="bi bi-check-circle me-2"></i>{{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            <form method="POST" enctype="multipart/form-data" id="profile-form">
+                {% csrf_token %}
+                
+                <div class="text-center mb-4">
+                    <label for="{{ form.profile_picture.id_for_label }}" class="profile-picture-container">
+                        <img id="profile-pic-preview" src="{{ user.profile.profile_picture.url }}" alt="Profile Picture">
+                        <div class="profile-picture-overlay">
+                            <i class="bi bi-camera fs-3"></i>
+                            <p class="mb-0 small">CHANGE</p>
+                        </div>
+                    </label>
+                    <h5 class="mt-3" style="font-family: 'Fira Code', monospace; color: var(--text-primary);">@{{ user.username }}</h5>
+                </div>
+
+                {{ form.profile_picture }}
+
+                <div class="mb-3">
+                    <label for="{{ form.display_name.id_for_label }}" class="form-label">
+                        <i class="bi bi-person-fill me-2"></i>Display Name
+                    </label>
+                    {{ form.display_name }}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.about_me.id_for_label }}" class="form-label">
+                        <i class="bi bi-pencil-fill me-2"></i>About Me
+                    </label>
+                    {{ form.about_me }}
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="auth-btn">
+                        <i class="bi bi-save-fill me-2"></i>Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const profilePicInput = document.getElementById('{{ form.profile_picture.id_for_label }}');
@@ -113,5 +279,4 @@
         });
     });
 </script>
-
 {% endblock %}

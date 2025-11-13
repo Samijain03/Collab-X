@@ -1,30 +1,286 @@
 {% extends 'chatapp/base.html' %}
-{% load crispy_forms_tags %}  {% block title %}Log In | Collab-X{% endblock %}
+{% load crispy_forms_tags %}
+{% block title %}Log In | Collab-X{% endblock %}
+
+{% block extra_head %}
+<style>
+    .auth-container {
+        min-height: calc(100vh - 56px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+        background: var(--dark-bg);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .auth-container::before {
+        content: '';
+        position: absolute;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(0, 255, 159, 0.15) 0%, transparent 70%);
+        border-radius: 50%;
+        top: -200px;
+        right: -200px;
+        animation: float 6s ease-in-out infinite;
+    }
+
+    .auth-container::after {
+        content: '';
+        position: absolute;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(0, 212, 255, 0.1) 0%, transparent 70%);
+        border-radius: 50%;
+        bottom: -150px;
+        left: -150px;
+        animation: float 8s ease-in-out infinite reverse;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(30px, 30px); }
+    }
+
+    .auth-card {
+        width: 100%;
+        max-width: 480px;
+        background: var(--card-bg);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 60px rgba(0, 255, 159, 0.2);
+        overflow: hidden;
+        animation: slideUp 0.5s ease-out;
+        border: 1px solid var(--border-color);
+        position: relative;
+        z-index: 1;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .auth-header {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        color: var(--darker-bg);
+        padding: 2.5rem 2rem;
+        text-align: center;
+        position: relative;
+    }
+
+    .auth-header::before {
+        content: '< >';
+        position: absolute;
+        top: 1rem;
+        left: 1.5rem;
+        font-size: 1.5rem;
+        opacity: 0.3;
+        font-family: 'Fira Code', monospace;
+    }
+
+    .auth-header h2 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 2rem;
+        font-family: 'Fira Code', monospace;
+    }
+
+    .auth-header p {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+        font-size: 0.95rem;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .auth-body {
+        padding: 2.5rem 2rem;
+    }
+
+    .form-floating {
+        margin-bottom: 1.5rem;
+    }
+
+    /* Enhanced specificity for form controls in auth pages */
+    .auth-body .form-floating input,
+    .auth-body .form-floating input[type="text"],
+    .auth-body .form-floating input[type="password"] {
+        border-radius: 0.75rem !important;
+        border: 2px solid var(--border-color) !important;
+        padding: 1rem 1.25rem !important;
+        transition: var(--transition);
+        height: 60px;
+        background-color: var(--darker-bg) !important;
+        color: var(--text-primary) !important;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .auth-body .form-floating input:focus {
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 0.25rem rgba(0, 255, 159, 0.25) !important;
+        background-color: var(--darker-bg) !important;
+        outline: none !important;
+    }
+
+    /* Prevent autofill styling issues */
+    .auth-body .form-floating input:-webkit-autofill,
+    .auth-body .form-floating input:-webkit-autofill:hover,
+    .auth-body .form-floating input:-webkit-autofill:focus {
+        -webkit-text-fill-color: var(--text-primary) !important;
+        -webkit-box-shadow: 0 0 0 1000px var(--darker-bg) inset !important;
+        box-shadow: 0 0 0 1000px var(--darker-bg) inset !important;
+        transition: background-color 5000s ease-in-out 0s;
+    }
+
+    .form-floating label {
+        padding: 1rem 1.25rem;
+        color: var(--text-secondary);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .form-floating input:focus ~ label,
+    .form-floating input:not(:placeholder-shown) ~ label {
+        color: var(--primary-color);
+    }
+
+    .auth-btn {
+        width: 100%;
+        padding: 1rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 0.75rem;
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        border: none;
+        color: var(--darker-bg);
+        transition: var(--transition);
+        box-shadow: 0 4px 12px rgba(0, 255, 159, 0.3);
+        font-family: 'Fira Code', monospace;
+    }
+
+    .auth-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-neon);
+    }
+
+    .auth-btn:active {
+        transform: translateY(0);
+    }
+
+    .auth-footer {
+        text-align: center;
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .auth-footer a {
+        color: var(--primary-color);
+        font-weight: 600;
+        text-decoration: none;
+        transition: var(--transition);
+    }
+
+    .auth-footer a:hover {
+        color: var(--primary-light);
+        text-decoration: underline;
+        text-shadow: 0 0 10px rgba(0, 255, 159, 0.5);
+    }
+
+    .error-message {
+        background-color: rgba(255, 0, 110, 0.1);
+        border-left: 4px solid var(--danger-color);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        animation: shake 0.5s;
+        color: var(--text-primary);
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+    }
+
+    .invalid-feedback {
+        display: block;
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--danger-color);
+        font-weight: 500;
+    }
+
+    @media (max-width: 576px) {
+        .auth-body {
+            padding: 2rem 1.5rem;
+        }
+
+        .auth-header {
+            padding: 2rem 1.5rem;
+        }
+
+        .auth-header h2 {
+            font-size: 1.75rem;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-center">
-    <div class="col-md-8 col-lg-6 col-xl-5">
-        <div class="card shadow-lg border-0 rounded-4">
-            <div class="card-body p-4 p-md-5">
-                <h2 class="card-title text-center fw-bold mb-4">Log In to Collab-X</h2>
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2><i class="bi bi-terminal me-2"></i>$ ssh login</h2>
+            <p>// Authenticate to continue</p>
+        </div>
+        
+        <div class="auth-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
 
-                <form method="post" novalidate>
-                    {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="error-message">
+                    {% for error in form.non_field_errors %}
+                        <p class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
 
-                    {{ form|crispy }}
+                {% for field in form %}
+                <div class="form-floating">
+                    {{ field }}
+                    <label for="{{ field.id_for_label }}">
+                        {% if 'username' in field.name %}
+                            <i class="bi bi-person-fill me-2"></i>
+                        {% elif 'password' in field.name %}
+                            <i class="bi bi-key-fill me-2"></i>
+                        {% endif %}
+                        {{ field.label }}
+                    </label>
+                    {% for error in field.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
 
-                    <div class="d-grid mt-4">
-                        <button type="submit" class="btn btn-dark btn-lg">Log In</button>
-                    </div>
-                </form>
+                <button type="submit" class="auth-btn">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>Execute Login
+                </button>
 
-                <div class="text-center mt-4">
+                <div class="auth-footer">
                     <small class="text-muted">
-                        Don't have an account? 
-                        <a href="{% url 'chatapp:signup' %}" class="fw-bold">Sign Up</a>
+                        No account? 
+                        <a href="{% url 'chatapp:signup' %}">git clone signup</a>
                     </small>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>

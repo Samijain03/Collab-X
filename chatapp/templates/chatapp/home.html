@@ -1,34 +1,307 @@
+<!-- HOME.HTML -->
 {% extends 'chatapp/base.html' %}
-
 {% block title %}{{ title }} | Collab-X{% endblock %}
 
+{% block extra_head %}
+<style>
+    .home-container {
+        min-height: calc(100vh - 56px);
+        background: var(--dark-bg);
+    }
+
+    .hero-section {
+        padding: 4rem 0;
+        text-align: center;
+        animation: fadeIn 1s ease-out;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .hero-section::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(0, 255, 159, 0.1) 0%, transparent 70%);
+        animation: pulse 4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.5; }
+        50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-content {
+        background: var(--card-bg);
+        border-radius: 2rem;
+        padding: 4rem 2rem;
+        box-shadow: 0 20px 60px rgba(0, 255, 159, 0.2);
+        margin: 0 auto;
+        max-width: 900px;
+        border: 1px solid var(--border-color);
+        position: relative;
+        z-index: 1;
+    }
+
+    .hero-icon {
+        font-size: 4rem;
+        color: var(--primary-color);
+        margin-bottom: 1.5rem;
+        animation: float 3s ease-in-out infinite;
+        text-shadow: 0 0 30px rgba(0, 255, 159, 0.8);
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+
+    .hero-content h1 {
+        font-weight: 800;
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        color: var(--primary-color);
+        text-shadow: 0 0 20px rgba(0, 255, 159, 0.5);
+        font-family: 'Fira Code', monospace;
+    }
+
+    .hero-content h1::before {
+        content: '> ';
+        color: var(--accent-cyan);
+    }
+
+    .hero-content p {
+        font-size: 1.25rem;
+        color: var(--text-secondary);
+        margin-bottom: 2rem;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .hero-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .hero-btn {
+        padding: 1rem 2.5rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 0.75rem;
+        transition: var(--transition);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: 'Fira Code', monospace;
+    }
+
+    .hero-btn-primary {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        color: var(--darker-bg);
+        box-shadow: 0 4px 12px rgba(0, 255, 159, 0.3);
+        font-weight: 700;
+    }
+
+    .hero-btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-neon);
+        color: var(--darker-bg);
+    }
+
+    .hero-btn-secondary {
+        background: transparent;
+        color: var(--primary-color);
+        border: 2px solid var(--primary-color);
+    }
+
+    .hero-btn-secondary:hover {
+        background: var(--primary-color);
+        color: var(--darker-bg);
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-neon);
+    }
+
+    .features-section {
+        padding: 3rem 0;
+    }
+
+    .feature-card {
+        background: var(--card-bg);
+        border-radius: 1.5rem;
+        padding: 2.5rem;
+        height: 100%;
+        box-shadow: 0 10px 30px rgba(0, 255, 159, 0.1);
+        transition: var(--transition);
+        border: 1px solid var(--border-color);
+    }
+
+    .feature-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 40px rgba(0, 255, 159, 0.2);
+        border-color: var(--primary-color);
+    }
+
+    .feature-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        margin-bottom: 1.5rem;
+        transition: var(--transition);
+    }
+
+    .feature-card:nth-child(1) .feature-icon {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        color: var(--darker-bg);
+        box-shadow: 0 0 20px rgba(0, 255, 159, 0.5);
+    }
+
+    .feature-card:nth-child(2) .feature-icon {
+        background: linear-gradient(135deg, var(--accent-pink) 0%, var(--accent-purple) 100%);
+        color: var(--white);
+        box-shadow: 0 0 20px rgba(255, 0, 110, 0.5);
+    }
+
+    .feature-card:nth-child(3) .feature-icon {
+        background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--primary-color) 100%);
+        color: var(--darker-bg);
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+    }
+
+    .feature-card:nth-child(4) .feature-icon {
+        background: linear-gradient(135deg, var(--primary-light) 0%, var(--accent-purple) 100%);
+        color: var(--darker-bg);
+        box-shadow: 0 0 20px rgba(102, 255, 191, 0.5);
+    }
+
+    .feature-card:hover .feature-icon {
+        transform: rotate(5deg) scale(1.1);
+    }
+
+    .feature-card h3 {
+        font-weight: 700;
+        margin-bottom: 1rem;
+        color: var(--primary-color);
+        font-family: 'Fira Code', monospace;
+    }
+
+    .feature-card p {
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    @media (max-width: 768px) {
+        .hero-content {
+            padding: 3rem 1.5rem;
+        }
+
+        .hero-content h1 {
+            font-size: 2rem;
+        }
+
+        .hero-content p {
+            font-size: 1.1rem;
+        }
+
+        .hero-buttons {
+            flex-direction: column;
+        }
+
+        .hero-btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .feature-card {
+            margin-bottom: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="p-5 mb-4 bg-light rounded-3 text-center">
-    <div class="container-fluid py-5">
-        <h1 class="display-5 fw-bold">Welcome to Collab-X 🤝</h1>
-        <p class="fs-4">The best place to connect and collaborate. Join the conversation today!</p>
-        
-        {% if user.is_authenticated %}
-            <a class="btn btn-primary btn-lg" href="{% url 'chatapp:dashboard' %}" role="button">Go to Your Dashboard</a>
-        {% else %}
-            <a class="btn btn-primary btn-lg" href="{% url 'chatapp:signup' %}" role="button">Get Started</a>
-            <a class="btn btn-secondary btn-lg" href="{% url 'chatapp:login' %}" role="button">Login</a>
-        {% endif %}
-
-    </div>
-</div>
-
-<div class="row align-items-md-stretch">
-    <div class="col-md-6 mb-3">
-        <div class="h-100 p-5 text-white bg-dark rounded-3">
-            <h2>Real-time Messaging</h2>
-            <p>Experience seamless, real-time messaging with instant notifications. Never miss an important update.</p>
+<div class="home-container">
+    <div class="container">
+        <div class="hero-section">
+            <div class="hero-content">
+                <div class="hero-icon">
+                    <i class="bi bi-terminal-fill"></i>
+                </div>
+                <h1>Welcome to Collab-X</h1>
+                <p>// Connect, code, collaborate in real-time</p>
+                
+                <div class="hero-buttons">
+                    {% if user.is_authenticated %}
+                        <a class="hero-btn hero-btn-primary" href="{% url 'chatapp:dashboard' %}">
+                            <i class="bi bi-terminal"></i>
+                            $ cd dashboard
+                        </a>
+                    {% else %}
+                        <a class="hero-btn hero-btn-primary" href="{% url 'chatapp:signup' %}">
+                            <i class="bi bi-code-slash"></i>
+                            git init --free
+                        </a>
+                        <a class="hero-btn hero-btn-secondary" href="{% url 'chatapp:login' %}">
+                            <i class="bi bi-box-arrow-in-right"></i>
+                            ssh login
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
-    </div>
-    <div class="col-md-6 mb-3">
-        <div class="h-100 p-5 bg-light border rounded-3">
-            <h2>Secure & Private</h2>
-            <p>Your conversations are important. We prioritize your security and privacy with end-to-end best practices.</p>
+
+        <div class="features-section">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </div>
+                        <h3>⚡ Real-time Sync</h3>
+                        <p>WebSocket-powered instant messaging. Zero latency, maximum productivity. Stay connected with microsecond precision.</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="bi bi-shield-lock-fill"></i>
+                        </div>
+                        <h3>🔐 Encrypted & Secure</h3>
+                        <p>End-to-end encryption with industry-grade security protocols. Your data, your control. Privacy by design.</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="bi bi-people-fill"></i>
+                        </div>
+                        <h3>👥 Team Collaboration</h3>
+                        <p>Create channels, manage teams, scale effortlessly. Built for developers who ship together.</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="bi bi-cpu-fill"></i>
+                        </div>
+                        <h3>🤖 AI Assistant</h3>
+                        <p>Intelligent bot with /Collab commands. Code suggestions, smart replies, automated workflows at your fingertips.</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

@@ -225,7 +225,14 @@ def edit_group_view(request, group_id):
     else:
         form = ChangeGroupNameForm(instance=group)
 
-    context = {'form': form, 'group': group, 'title': f'Edit {group.name}'}
+    context = {
+    'form': form, 
+    'group': group, 
+    'title': f'Edit {group.name}', 
+    'header_icon': 'bi-pencil-square',
+    'header_text': '$ chmod +w',
+    'button_text': 'Save Changes'
+    }
     return render(request, 'chatapp/edit_group.html', context)
 
 
@@ -248,7 +255,14 @@ def add_group_members_view(request, group_id):
     else:
         form = AddGroupMemberForm(user=request.user, group=group)
 
-    context = {'form': form, 'group': group, 'title': 'Add Members'}
+    context = {
+    'form': form, 
+    'group': group, 
+    'title': 'Add Members', 
+    'header_icon': 'bi-person-plus',
+    'header_text': '$ useradd -G',
+    'button_text': 'Add Members'
+    }
     return render(request, 'chatapp/edit_group.html', context)
 
 
@@ -271,5 +285,12 @@ def remove_group_members_view(request, group_id):
     else:
         form = RemoveGroupMemberForm(user=request.user, group=group)
 
-    context = {'form': form, 'group': group, 'title': 'Remove Members'}
+    context = {
+    'form': form, 
+    'group': group, 
+    'title': 'Remove Members', 
+    'header_icon': 'bi-person-dash',
+    'header_text': '$ gpasswd -d',
+    'button_text': 'Remove Members'
+    }
     return render(request, 'chatapp/edit_group.html', context)

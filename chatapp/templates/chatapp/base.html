@@ -9,122 +9,465 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            --primary-color: #00ff9f;
+            --primary-dark: #00cc7f;
+            --primary-light: #66ffbf;
+            --accent-cyan: #00d4ff;
+            --accent-purple: #bd00ff;
+            --accent-pink: #ff006e;
+            --secondary-color: #8b949e;
+            --success-color: #00ff9f;
+            --danger-color: #ff006e;
+            --warning-color: #ffbd2e;
+            --dark-bg: #0d1117;
+            --darker-bg: #010409;
+            --card-bg: #161b22;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --white: #ffffff;
+            --shadow-sm: 0 0.125rem 0.25rem rgba(0, 255, 159, 0.1);
+            --shadow-md: 0 0.5rem 1rem rgba(0, 255, 159, 0.15);
+            --shadow-lg: 0 1rem 3rem rgba(0, 255, 159, 0.2);
+            --shadow-neon: 0 0 20px rgba(0, 255, 159, 0.5);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
-            background-color: #f8f9fa; /* Light background */
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            background-attachment: fixed;
         }
+
         .main-content {
-            flex: 1; /* Allows content to grow and fill space */
-            display: flex; /* Allows child (dashboard) to be full height */
+            flex: 1;
+            display: flex;
             flex-direction: column;
         }
+
+        /* Enhanced Dark Navbar */
+        .navbar {
+            background: rgba(1, 4, 9, 0.95) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 255, 159, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 0;
+            transition: var(--transition);
+            position: relative;
+            z-index: 1030;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--primary-color) !important;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-shadow: 0 0 10px rgba(0, 255, 159, 0.5);
+        }
+
+        .navbar-brand:hover {
+            color: var(--primary-light) !important;
+            transform: translateY(-2px);
+            text-shadow: 0 0 20px rgba(0, 255, 159, 0.8);
+        }
+
+        .navbar-toggler {
+            border: 1px solid var(--primary-color);
+            padding: 0.5rem;
+        }
+
+        .navbar-toggler:focus {
+            box-shadow: 0 0 0 0.25rem rgba(0, 255, 159, 0.25);
+        }
+
+        .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%2300ff9f' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+
+        /* Enhanced Dark Buttons */
+        .btn {
+            font-weight: 500;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1.25rem;
+            transition: var(--transition);
+            border: none;
+            font-family: 'Fira Code', monospace;
+        }
+
         .btn-primary {
-            background-color: #6f42c1;
-            border-color: #6f42c1;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+            color: var(--darker-bg);
+            box-shadow: 0 4px 12px rgba(0, 255, 159, 0.3);
+            font-weight: 600;
         }
-        /* Make dropdown menu dark to match navbar */
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-neon);
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--accent-cyan) 100%);
+            color: var(--darker-bg);
+        }
+
+        .btn-outline-light {
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            background: transparent;
+        }
+
+        .btn-outline-light:hover {
+            background-color: var(--primary-color);
+            color: var(--darker-bg);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-neon);
+        }
+
+        /* Enhanced Dark Dropdown */
+        .dropdown-menu {
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-lg);
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            animation: slideDown 0.3s ease-out;
+            background: var(--card-bg);
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .dropdown-menu-dark {
-            background-color: #212529;
+            background-color: var(--card-bg);
         }
-        .dropdown-menu-dark .dropdown-item {
-            color: #f8f9fa;
+
+        .dropdown-item {
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            color: var(--text-primary);
         }
-        .dropdown-menu-dark .dropdown-item:hover {
-            background-color: #343a40;
+
+        .dropdown-item i {
+            width: 20px;
+            color: var(--primary-color);
+        }
+
+        .dropdown-item:hover {
+            background-color: rgba(0, 255, 159, 0.1);
+            transform: translateX(5px);
+            color: var(--primary-color);
+        }
+
+        .dropdown-divider {
+            margin: 0.5rem 0;
+            border-color: var(--border-color) !important;
+        }
+
+        /* Profile Picture in Navbar */
+        .nav-link img.rounded-circle {
+            width: 38px;
+            height: 38px;
+            object-fit: cover;
+            border: 2px solid var(--primary-color);
+            transition: var(--transition);
+            box-shadow: 0 0 10px rgba(0, 255, 159, 0.3);
+        }
+
+        .nav-link:hover img.rounded-circle {
+            border-color: var(--primary-light);
+            transform: scale(1.1);
+            box-shadow: var(--shadow-neon);
+        }
+
+        .nav-link.dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            transition: var(--transition);
+            color: var(--text-primary) !important;
+        }
+
+        .nav-link.dropdown-toggle:hover {
+            background-color: rgba(0, 255, 159, 0.1);
+            color: var(--primary-color) !important;
+        }
+
+        /* Modal Enhancements */
+        .modal-content {
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+            background: var(--card-bg);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+            color: var(--darker-bg);
+            border: none;
+            padding: 1.5rem;
+        }
+
+        .modal-body {
+            padding: 2rem;
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .btn-close {
+            filter: brightness(0) invert(1);
+            opacity: 0.8;
+        }
+
+        .btn-close:hover {
+            opacity: 1;
+        }
+
+        /* Profile Picture Modal */
+        #profilePicModal .modal-content {
+            background-color: rgba(1, 4, 9, 0.95);
+            border: 1px solid var(--primary-color);
+        }
+
+        #profilePicModal img {
+            border-radius: 1rem;
+            border: 2px solid var(--primary-color);
+            box-shadow: var(--shadow-neon);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .navbar-brand {
+                font-size: 1.25rem;
+            }
+
+            .btn {
+                padding: 0.4rem 1rem;
+                font-size: 0.9rem;
+            }
+
+            .nav-link img.rounded-circle {
+                width: 32px;
+                height: 32px;
+            }
+        }
+
+        /* Card Enhancements */
+        .card {
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition);
+            background: var(--card-bg);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-5px);
+            border-color: var(--primary-color);
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 255, 159, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Smooth Scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Focus States */
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.25rem rgba(0, 255, 159, 0.25);
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .form-control,
+        .form-select {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        /* Code-style text elements */
+        code, pre {
+            background: var(--darker-bg);
+            color: var(--primary-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            padding: 0.2rem 0.4rem;
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--darker-bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-light);
         }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="d-flex flex-column vh-100">
 
-   <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-    <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="{% url 'chatapp:home' %}">🤝 Collab-X</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            
-            <ul class="navbar-nav ms-auto align-items-center">
-    {% if user.is_authenticated %}
-        <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <img src="{{ user.profile.profile_picture.url }}" alt="Profile" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
-                Hello, {{ user.profile.display_name|default:user.username }}
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'chatapp:home' %}">
+                <i class="bi bi-code-slash"></i>
+                &lt;Collab-X/&gt;
             </a>
-            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
-                <li><a class="dropdown-item" href="{% url 'chatapp:dashboard' %}"><i class="bi bi-chat-dots-fill me-2"></i>Dashboard</a></li>
-                <li><a class="dropdown-item" href="{% url 'chatapp:settings' %}"><i class="bi bi-gear-fill me-2"></i>Settings</a></li>
-                <li><hr class="dropdown-divider" style="border-color: #495057;"></li>
-                <li><a class="dropdown-item" href="{% url 'chatapp:logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
-            </ul>
-        </li>
-    {% else %}
-        <li class="nav-item">
-            <a class="nav-link btn btn-primary text-white mx-2 px-3" href="{% url 'chatapp:signup' %}">Sign Up</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link btn btn-outline-light mx-2 px-3" href="{% url 'chatapp:login' %}">Login</a>
-        </li>
-    {% endif %}
-</ul>
-
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <img src="{{ user.profile.profile_picture.url }}" alt="Profile" class="rounded-circle">
+                                <span class="d-none d-md-inline">{{ user.profile.display_name|default:user.username }}</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'chatapp:dashboard' %}">
+                                        <i class="bi bi-terminal me-2"></i>Dashboard
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'chatapp:settings' %}">
+                                        <i class="bi bi-gear-fill me-2"></i>Settings
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'chatapp:logout' %}">
+                                        <i class="bi bi-power me-2"></i>Logout
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item me-2">
+                            <a class="nav-link btn btn-primary text-dark fw-bold" href="{% url 'chatapp:signup' %}">
+                                <i class="bi bi-person-plus-fill me-1"></i>Sign Up
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link btn btn-outline-light" href="{% url 'chatapp:login' %}">
+                                <i class="bi bi-box-arrow-in-right me-1"></i>Login
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
         </div>
-    </div>
-</nav>
+    </nav>
 
     <main class="main-content">
         {% block content %}
         {% endblock %}
     </main>
-<div class="modal fade" id="profilePicModal" tabindex="-1" aria-labelledby="profilePicModalLabel" aria-hidden="true">
+
+    <!-- Enhanced Profile Picture Modal -->
+    <div class="modal fade" id="profilePicModal" tabindex="-1" aria-labelledby="profilePicModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content bg-transparent border-0">
                 <div class="modal-header border-0">
-                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body text-center">
-                    <img id="modalProfilePicImage" src="" class="img-fluid rounded" alt="Profile Picture" style="max-height: 80vh;">
+                <div class="modal-body text-center p-0">
+                    <img id="modalProfilePicImage" src="" class="img-fluid" alt="Profile Picture" style="max-height: 80vh;">
                 </div>
             </div>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     {% block extra_js %}{% endblock %}
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Get the modal and the image inside it
             const profilePicModal = document.getElementById('profilePicModal');
             const modalImage = document.getElementById('modalProfilePicImage');
 
-            // Listen for click events on ANY element that has the class 'profile-pic-clickable'
             document.body.addEventListener('click', function(event) {
-                // Check if the clicked element or its parent has the class
                 const clickableImage = event.target.closest('.profile-pic-clickable');
                 
                 if (clickableImage) {
-                    // Prevent the default link behavior
-                    event.preventDefault(); 
-                    
-                    // Get the 'src' from the clicked <img> tag
-                    const newSrc = clickableImage.querySelector('img').src;
-                    
-                    // Set the modal's image 'src'
-                    modalImage.src = newSrc;
-                    
-                    // Manually trigger the modal (since we prevented default)
-                    const bsModal = new bootstrap.Modal(profilePicModal);
-                    bsModal.show();
+                    event.preventDefault();
+                    const img = clickableImage.querySelector('img');
+                    if (img && img.src) {
+                        modalImage.src = img.src;
+                        const bsModal = new bootstrap.Modal(profilePicModal);
+                        bsModal.show();
+                    }
                 }
+            });
+
+            // Add smooth scroll behavior
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        e.preventDefault();
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
             });
         });
     </script>
-    </body>
+</body>
 </html>

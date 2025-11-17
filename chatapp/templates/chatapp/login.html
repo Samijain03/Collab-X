@@ -104,14 +104,30 @@
         padding: 2.5rem 2rem;
     }
 
-    .form-floating {
+    .form-group {
         margin-bottom: 1.5rem;
+        position: relative;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .form-group label i {
+        color: var(--primary-color);
+        margin-right: 0.5rem;
     }
 
     /* Enhanced specificity for form controls in auth pages */
-    .auth-body .form-floating input,
-    .auth-body .form-floating input[type="text"],
-    .auth-body .form-floating input[type="password"] {
+    .auth-body .form-group input,
+    .auth-body .form-group input[type="text"],
+    .auth-body .form-group input[type="password"] {
+        width: 100%;
         border-radius: 0.75rem !important;
         border: 2px solid var(--border-color) !important;
         padding: 1rem 1.25rem !important;
@@ -120,9 +136,10 @@
         background-color: var(--darker-bg) !important;
         color: var(--text-primary) !important;
         font-family: 'JetBrains Mono', monospace;
+        font-size: 1rem;
     }
 
-    .auth-body .form-floating input:focus {
+    .auth-body .form-group input:focus {
         border-color: var(--primary-color) !important;
         box-shadow: 0 0 0 0.25rem rgba(0, 255, 159, 0.25) !important;
         background-color: var(--darker-bg) !important;
@@ -130,24 +147,13 @@
     }
 
     /* Prevent autofill styling issues */
-    .auth-body .form-floating input:-webkit-autofill,
-    .auth-body .form-floating input:-webkit-autofill:hover,
-    .auth-body .form-floating input:-webkit-autofill:focus {
+    .auth-body .form-group input:-webkit-autofill,
+    .auth-body .form-group input:-webkit-autofill:hover,
+    .auth-body .form-group input:-webkit-autofill:focus {
         -webkit-text-fill-color: var(--text-primary) !important;
         -webkit-box-shadow: 0 0 0 1000px var(--darker-bg) inset !important;
         box-shadow: 0 0 0 1000px var(--darker-bg) inset !important;
         transition: background-color 5000s ease-in-out 0s;
-    }
-
-    .form-floating label {
-        padding: 1rem 1.25rem;
-        color: var(--text-secondary);
-        font-family: 'JetBrains Mono', monospace;
-    }
-
-    .form-floating input:focus ~ label,
-    .form-floating input:not(:placeholder-shown) ~ label {
-        color: var(--primary-color);
     }
 
     .auth-btn {
@@ -254,16 +260,16 @@
                 {% endif %}
 
                 {% for field in form %}
-                <div class="form-floating">
-                    {{ field }}
+                <div class="form-group">
                     <label for="{{ field.id_for_label }}">
                         {% if 'username' in field.name %}
-                            <i class="bi bi-person-fill me-2"></i>
+                            <i class="bi bi-person-fill"></i>
                         {% elif 'password' in field.name %}
-                            <i class="bi bi-key-fill me-2"></i>
+                            <i class="bi bi-key-fill"></i>
                         {% endif %}
                         {{ field.label }}
                     </label>
+                    {{ field }}
                     {% for error in field.errors %}
                         <div class="invalid-feedback">{{ error }}</div>
                     {% endfor %}

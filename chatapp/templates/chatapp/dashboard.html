@@ -1,9 +1,76 @@
 {% extends 'chatapp/base.html' %}
 {% load static %}
 {% block title %}Dashboard | Collab-X{% endblock %}
-
 {% block extra_head %}
 <style>
+    .chat-container {
+        display: flex;
+        height: calc(100vh - 56px);
+        background-color: var(--dark-bg);
+    }
+    /* === LEFT SIDEBAR === */
+    .sidebar {
+        width: 100%;
+        max-width: 380px;
+        background: var(--card-bg);
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        transition: var(--transition);
+    }
+    /* === CHAT AREA === */
+    .chat-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--dark-bg);
+    }
+    /* === RIGHT SIDEBAR (NEW) === */
+    .sidebar-right {
+        width: 320px;
+        background: var(--card-bg);
+        border-left: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        right: -320px;
+        top: 56px;
+        height: calc(100vh - 56px);
+        z-index: 1000;
+        transition: right 0.3s ease;
+    }
+    .sidebar-right.show {
+        right: 0;
+    }
+    @media (min-width: 992px) {
+        .sidebar-right {
+            position: relative;
+            right: 0;
+            top: 0;
+            height: 100%;
+        }
+    }
+    .sidebar-header {
+        padding: 1.25rem;
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        color: var(--darker-bg);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .file-item {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .file-item:hover {
+        background: var(--dark-bg);
+    }
+    .file-item.py i { color: #ffd43b; }
+    .file-item.html i { color: #e34c26; }
     .chat-container {
         display: flex;
         height: calc(100vh - 56px);
@@ -651,6 +718,7 @@
 
 {% block content %}
 <div class="chat-container">
+    <!-- LEFT SIDEBAR -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h5><i class="bi bi-terminal me-2"></i>Messages</h5>
@@ -740,6 +808,7 @@
         </div>
     </div>
 
+    <!-- MAIN CHAT AREA -->
     <div class="chat-area">
         {% if selected_contact or selected_group %}
             <div class="chat-header">
@@ -808,22 +877,45 @@
             </div>
 
             <div class="chat-input">
-                <form class="input-group" id="chat-form">
+                <div class="input-group">
+                    <!-- ATTACHMENT BUTTON -->
+                    <button class="btn btn-outline-secondary" id="toggle-file-sidebar" title="Attach file">
+                        <i class="bi bi-paperclip"></i>
+                    </button>
                     <input type="text" id="message-input" class="form-control" placeholder="Type a message... (Use /Collab for AI)" required>
-                    <button class="btn btn-primary ms-2" type="submit">
+                    <button class="btn btn-primary ms-2" type="submit" form="chat-form">
                         <i class="bi bi-send-fill"></i>
                     </button>
-                </form>
+                </div>
             </div>
         {% else %}
             <div class="placeholder-area">
                 <div>
                     <i class="bi bi-chat-heart-fill"></i>
-                    <h3>Welcome to &lt;Collab-X/&gt;</h3>
+                    <h3>Welcome to <Collab-X/></h3>
                     <p>Select a contact or group to start messaging</p>
                 </div>
             </div>
         {% endif %}
+    </div>
+
+    <!-- RIGHT SIDEBAR: FILE MANAGER -->
+    <div class="sidebar-right" id="file-sidebar">
+        <div class="sidebar-header d-flex justify-content-between align-items-center">
+            <h6><i class="bi bi-file-code me-2"></i>Project Files</h6>
+            <button class="btn btn-sm text-white" id="close-file-sidebar"><i class="bi bi-x"></i></button>
+        </div>
+        <div class="file-list p-2" id="project-file-list" style="flex:1; overflow-y:auto;">
+            <!-- Filled by JS -->
+        </div>
+        <div class="p-2 border-top border-secondary">
+            <form id="upload-file-form" enctype="multipart/form-data">
+                <input type="file" id="file-input" accept=".py,.html" hidden>
+                <button type="button" class="btn btn-primary w-100" id="upload-file-btn">
+                    <i class="bi bi-plus-lg me-1"></i> Add File
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -835,35 +927,154 @@
 
 {% block extra_js %}
 <script>
+// Toggle right sidebar
+document.getElementById('toggle-file-sidebar')?.addEventListener('click', () => {
+    document.getElementById('file-sidebar').classList.toggle('show');
+});
+document.getElementById('close-file-sidebar')?.addEventListener('click', () => {
+    document.getElementById('file-sidebar').classList.remove('show');
+});
+
+// Upload file
+document.getElementById('upload-file-btn')?.addEventListener('click', () => {
+    document.getElementById('file-input').click();
+});
+document.getElementById('file-input')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    const group_id = "{{ selected_group.id }}";
+    if (!group_id) {
+        alert("File uploads only supported in group chats.");
+        return;
+    }
+    const res = await fetch(`/group/${group_id}/upload-file/`, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    });
+    if (res.ok) {
+        loadProjectFiles();
+        document.getElementById('file-input').value = '';
+    } else {
+        const err = await res.json();
+        alert('Upload failed: ' + (err.error || 'Unknown error'));
+    }
+});
+
+// Load file list
+async function loadProjectFiles() {
+    const group_id = "{{ selected_group.id }}";
+    if (!group_id) return;
+    const res = await fetch(`/group/${group_id}/files/`);
+    const files = await res.json();
+    const list = document.getElementById('project-file-list');
+    list.innerHTML = files.length ? '' : '<p class="text-center text-muted mt-3">No files yet</p>';
+    files.forEach(file => {
+        const icon = file.file_type === 'py' ? 'bi-filetype-py' : 'bi-filetype-html';
+        const cls = `file-item ${file.file_type}`;
+        list.innerHTML += `
+            <div class="${cls}" data-file-id="${file.id}" title="${file.name}">
+                <i class="bi ${icon}"></i>
+                <span class="ms-2">${file.name}</span>
+                <small class="text-muted">${file.uploaded_by}</small>
+            </div>
+        `;
+    });
+    list.querySelectorAll('.file-item').forEach(el => {
+        el.addEventListener('click', () => viewFile(el.dataset.fileId));
+    });
+}
+
+// View file modal
+async function viewFile(fileId) {
+    const res = await fetch(`/file/${fileId}/content/`);
+    if (!res.ok) return alert('Failed to load file');
+    const data = await res.json();
+
+    const modal = document.createElement('div');
+    modal.innerHTML = `
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${data.name}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <pre style="margin:0; padding:1.25rem; background:var(--darker-bg);"><code id="file-code">${data.content}</code></pre>
+                        <div class="modal-footer" style="justify-content:space-between;">
+                            <a href="${data.url}" target="_blank" class="btn btn-outline-primary btn-sm">Open</a>
+                            ${data.file_type === 'html' ? '<button class="btn btn-success btn-sm" onclick="runHtml()">Run HTML</button>' : ''}
+                            ${data.file_type === 'py' ? '<button class="btn btn-success btn-sm" onclick="runPython()">Run Python</button>' : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show"></div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.querySelector('.btn-close, .modal-backdrop').onclick = () => {
+        document.body.removeChild(modal);
+    };
+}
+
+// Run HTML
+function runHtml() {
+    const code = document.getElementById('file-code').textContent;
+    const win = window.open('', '_blank');
+    win.document.write(code);
+    win.document.close();
+}
+
+// Run Python (safe, in-browser via Pyodide)
+async function runPython() {
+    if (!window.pyodide) {
+        alert('Loading Python runtime (Pyodide)...');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js';
+        script.onload = () => runPython();
+        document.head.appendChild(script);
+        return;
+    }
+    try {
+        const code = document.getElementById('file-code').textContent;
+        const output = await window.pyodide.runPythonAsync(code);
+        alert('Output:\n' + (output || '(no output)'));
+    } catch (e) {
+        alert('Error:\n' + e.message);
+    }
+}
+
+// Load files on group select
+if ("{{ selected_group.id }}") {
+    loadProjectFiles();
+}
+
+// === Keep your original WebSocket/Mobile JS below ===
 document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chat-messages');
-    const chatForm = document.getElementById('chat-form');
     const messageInput = document.getElementById('message-input');
     const mobileToggle = document.getElementById('mobileToggle');
     const mobileOverlay = document.getElementById('mobileOverlay');
     const sidebar = document.getElementById('sidebar');
-    
     let chatSocket = null;
 
-    // Scroll to bottom
-    if (chatMessages) {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
+    if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
 
-    // Mobile sidebar toggle
     if (mobileToggle) {
-        mobileToggle.addEventListener('click', function() {
+        mobileToggle.addEventListener('click', () => {
             sidebar.classList.toggle('show');
             mobileOverlay.classList.toggle('show');
         });
-
-        mobileOverlay.addEventListener('click', function() {
+        mobileOverlay.addEventListener('click', () => {
             sidebar.classList.remove('show');
             mobileOverlay.classList.remove('show');
         });
     }
 
-    // WebSocket setup
     const chatType = "{{ chat_type|default:'' }}";
     const chatId = "{{ chat_id|default:'' }}";
     const currentUsername = "{{ user.username }}";
@@ -873,203 +1084,69 @@ document.addEventListener('DOMContentLoaded', function() {
         const wsUrl = chatType === '1on1' 
             ? `${wsProtocol}//${window.location.host}/ws/chat/${chatId}/`
             : `${wsProtocol}//${window.location.host}/ws/group/${chatId}/`;
-
         chatSocket = new WebSocket(wsUrl);
 
         chatSocket.onmessage = function(e) {
             const data = JSON.parse(e.data);
-            
             if (data.type === 'chat_message') {
                 const isSent = data.sender_username === currentUsername;
-                const bubble = createMessageBubble(
-                    data.content,
-                    data.timestamp,
-                    isSent,
-                    chatType === 'group' ? data.sender_display_name : null,
-                    data.message_id
-                );
+                const bubble = document.createElement('div');
+                bubble.className = `message-bubble ${isSent ? 'sent' : 'received'}`;
+                bubble.dataset.messageId = data.message_id;
+                if (chatType === 'group' && !isSent) {
+                    const sender = document.createElement('small');
+                    sender.className = 'fw-bold d-block mb-1';
+                    sender.style.color = 'var(--primary-light)';
+                    sender.textContent = data.sender_username;
+                    bubble.appendChild(sender);
+                }
+                const p = document.createElement('p');
+                p.textContent = data.content;
+                bubble.appendChild(p);
+                if (isSent) {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-danger btn-sm delete-msg-btn float-end';
+                    btn.innerHTML = '<i class="bi bi-trash"></i>';
+                    bubble.appendChild(btn);
+                }
+                const time = document.createElement('span');
+                time.className = 'message-time';
+                time.textContent = data.timestamp;
+                bubble.appendChild(time);
                 chatMessages.appendChild(bubble);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
-            } 
-            else if (data.type === 'message_deleted') {
-                const bubble = document.querySelector(`.message-bubble[data-message-id='${data.message_id}']`);
-                if (bubble) {
-                    bubble.innerHTML = `
-                        <p class="fst-italic" style="opacity: 0.7;">This message was deleted.</p>
-                        <span class="message-time"></span>
-                    `;
-                }
-            }
-            else if (data.type === 'bot_message') {
-                if (data.status === 'thinking') {
-                    const bubble = createBotMessageBubble(data.content, data.sender_username, null, data.request_id);
-                    chatMessages.appendChild(bubble);
-                } else if (data.status === 'complete') {
-                    const existingBubble = document.getElementById(`bot-response-${data.request_id}`);
-                    if (existingBubble) {
-                        const contentP = existingBubble.querySelector(`#bot-content-${data.request_id}`);
-                        if (contentP) contentP.textContent = data.content;
-                        
-                        if (data.jump_id) {
-                            const jumpContainer = existingBubble.querySelector(`#bot-jump-${data.request_id}`);
-                            if (jumpContainer) {
-                                jumpContainer.innerHTML = '';
-                                const jumpBtn = document.createElement('button');
-                                jumpBtn.className = 'jump-btn';
-                                jumpBtn.textContent = 'Jump to message';
-                                jumpBtn.dataset.jumpId = data.jump_id;
-                                jumpContainer.appendChild(jumpBtn);
-                            }
-                        }
-                    }
-                }
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } else if (data.type === 'message_deleted') {
+                const el = document.querySelector(`.message-bubble[data-message-id='${data.message_id}']`);
+                if (el) el.innerHTML = `<p class="fst-italic" style="opacity:0.7;">This message was deleted.</p><span class="message-time"></span>`;
             }
         };
-
-        chatSocket.onclose = function(e) {
-            console.error('WebSocket closed', e);
-        };
     }
 
-    // Send message
-    if (chatForm) {
-        chatForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const message = messageInput.value.trim();
-            if (message && chatSocket) {
-                chatSocket.send(JSON.stringify({
-                    type: 'chat_message',
-                    message: message
-                }));
-                messageInput.value = '';
-            }
-        });
-    }
-
-    // Delete and jump handlers
-    if (chatMessages) {
-        chatMessages.addEventListener('click', function(e) {
-            const deleteButton = e.target.closest('.delete-msg-btn');
-            if (deleteButton) {
-                e.preventDefault();
-                const messageBubble = deleteButton.closest('.message-bubble');
-                const messageId = messageBubble.dataset.messageId;
-                
-                if (confirm('Delete this message?')) {
-                    if (chatSocket && messageId) {
-                        chatSocket.send(JSON.stringify({
-                            type: 'delete_message',
-                            message_id: messageId
-                        }));
-                    }
-                }
-            }
-
-            const jumpButton = e.target.closest('.jump-btn');
-            if (jumpButton) {
-                e.preventDefault();
-                const jumpId = jumpButton.dataset.jumpId;
-                const targetMessage = document.querySelector(`.message-bubble[data-message-id='${jumpId}']`);
-                
-                if (targetMessage) {
-                    targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    targetMessage.classList.add('highlight');
-                    setTimeout(() => targetMessage.classList.remove('highlight'), 2000);
-                } else {
-                    alert("Message not found in current view");
-                }
-            }
-        });
-    }
-
-    // Create message bubble
-    function createMessageBubble(content, timestamp, isSent, senderDisplayName, messageId) {
-        const bubble = document.createElement('div');
-        bubble.className = `message-bubble ${isSent ? 'sent' : 'received'}`;
-        bubble.dataset.messageId = messageId;
-
-        if (senderDisplayName && !isSent) {
-            const sender = document.createElement('small');
-            sender.className = 'fw-bold d-block mb-1';
-            sender.style.color = 'var(--primary-light)';
-            sender.textContent = senderDisplayName;
-            bubble.appendChild(sender);
+    document.getElementById('chat-form')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const msg = messageInput.value.trim();
+        if (msg && chatSocket) {
+            chatSocket.send(JSON.stringify({ type: 'chat_message', message: msg }));
+            messageInput.value = '';
         }
+    });
 
-        const content_p = document.createElement('p');
-        content_p.textContent = content;
-        bubble.appendChild(content_p);
-
-        if (isSent) {
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn btn-danger btn-sm delete-msg-btn float-end';
-            deleteBtn.title = 'Delete message';
-            deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-            bubble.appendChild(deleteBtn);
+    chatMessages?.addEventListener('click', function(e) {
+        const delBtn = e.target.closest('.delete-msg-btn');
+        if (delBtn && confirm('Delete this message?') && chatSocket) {
+            const id = delBtn.closest('.message-bubble').dataset.messageId;
+            chatSocket.send(JSON.stringify({ type: 'delete_message', message_id: id }));
         }
+    });
 
-        const time = document.createElement('span');
-        time.className = 'message-time';
-        time.textContent = timestamp;
-        bubble.appendChild(time);
-
-        return bubble;
-    }
-
-    // Create bot message bubble
-    function createBotMessageBubble(content, senderUsername, jumpId, requestId) {
-        const bubble = document.createElement('div');
-        bubble.className = 'message-bubble bot';
-        bubble.id = `bot-response-${requestId}`;
-
-        const avatar = document.createElement('img');
-        avatar.className = 'bot-avatar';
-        avatar.src = "{% static 'chatapp/images/bot_avatar.png' %}";
-        avatar.alt = 'Bot';
-        bubble.appendChild(avatar);
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'bot-content-wrapper';
-
-        const header = document.createElement('div');
-        header.className = 'bot-header';
-        header.innerHTML = `<i class="bi bi-robot"></i>${senderUsername}`;
-        wrapper.appendChild(header);
-
-        const contentP = document.createElement('p');
-        contentP.id = `bot-content-${requestId}`;
-        contentP.textContent = content;
-        wrapper.appendChild(contentP);
-
-        const jumpContainer = document.createElement('div');
-        jumpContainer.id = `bot-jump-${requestId}`;
-        if (jumpId) {
-            const jumpBtn = document.createElement('button');
-            jumpBtn.className = 'jump-btn';
-            jumpBtn.textContent = 'Jump to message';
-            jumpBtn.dataset.jumpId = jumpId;
-            jumpContainer.appendChild(jumpBtn);
-        }
-        wrapper.appendChild(jumpContainer);
-
-        bubble.appendChild(wrapper);
-        return bubble;
-    }
-
-    // Search filter
     const searchInput = document.getElementById('contact-search-input');
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const filter = this.value.toLowerCase();
-            const items = document.querySelectorAll('.contact-list .contact-item');
-            
-            items.forEach(function(item) {
-                const name = item.querySelector('.contact-info h6')?.textContent.toLowerCase() || '';
-                const username = item.querySelector('.contact-info small')?.textContent.toLowerCase() || '';
-                const text = name + username;
-                
-                item.style.display = text.includes(filter) ? 'flex' : 'none';
+        searchInput.addEventListener('input', () => {
+            const q = searchInput.value.toLowerCase();
+            document.querySelectorAll('.contact-item').forEach(el => {
+                const name = el.querySelector('h6')?.textContent.toLowerCase() || '';
+                const user = el.querySelector('small')?.textContent.toLowerCase() || '';
+                el.style.display = (name + user).includes(q) ? 'flex' : 'none';
             });
         });
     }

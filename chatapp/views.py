@@ -1,5 +1,7 @@
 # chatapp/views.py
 
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import AuthenticationForm
@@ -294,3 +296,64 @@ def remove_group_members_view(request, group_id):
     'button_text': 'Remove Members'
     }
     return render(request, 'chatapp/edit_group.html', context)
+
+# chatapp/views.py
+
+@login_required
+@require_http_methods(["POST"])
+def upload_project_file(request, group_id=None):
+    if not group_id:
+        return JsonResponse({'error': 'Group ID required'}, status=400)
+    uploaded_file = request.FILES.get('file')
+    if not uploaded_file:
+        return JsonResponse({'error': 'No file provided'}, status=400)
+
+    ext = uploaded_file.name.split('.')[-1].lower()
+    if ext not in ['py', 'html']:
+        return JsonResponse({'error': 'Only .py and .html files allowed'}, status=400)
+
+    file_type = 'py' if ext == 'py' else 'html'
+    project_file = ProjectFile.objects.create(
+        name=uploaded_file.name,
+        file=uploaded_file,
+        file_type=file_type,
+        group_id=group_id,
+        uploaded_by=request.user
+    )
+    return JsonResponse({
+        'id': project_file.id,
+        'name': project_file.name,
+        'file_type': project_file.file_type,
+        'url': project_file.file.url,
+        'uploaded_by': project_file.uploaded_by.username,
+    })
+
+
+@login_required
+def list_project_files(request, group_id):
+    files = ProjectFile.objects.filter(group_id=group_id).values(
+        'id', 'name', 'file_type', 'uploaded_by__username'
+    )
+    return JsonResponse(list(files), safe=False)
+
+
+@login_required
+def get_file_content(request, file_id):
+    try:
+        pf = ProjectFile.objects.get(id=file_id)
+        if request.user not in pf.group.members.all():
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+
+        pf.file.open()
+        content = pf.file.read().decode('utf-8')
+        pf.file.close()
+        return JsonResponse({
+            'id': pf.id,
+            'name': pf.name,
+            'content': content,
+            'file_type': pf.file_type,
+            'url': pf.file.url,
+            'uploaded_by': pf.uploaded_by.username,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

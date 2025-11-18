@@ -77,3 +77,21 @@ class GroupMessage(models.Model):
 
     def __str__(self):
         return f'{self.sender.username} in {self.group.name}: {self.content[:20]}'
+
+# chatapp/models.py
+
+class ProjectFile(models.Model):
+    FILE_TYPES = [
+        ('py', 'Python'),
+        ('html', 'HTML'),
+    ]
+    name = models.CharField(max_length=255)
+    file = models.FileField(upload_to='project_files/')
+    file_type = models.CharField(max_length=10, choices=FILE_TYPES)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, blank=True)
+    uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.file_type}) in {self.group or 'DM'}"

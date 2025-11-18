@@ -16,7 +16,10 @@ urlpatterns = [
     path('dashboard/', views.dashboard_view, name='dashboard'),
     path('dashboard/<int:contact_id>/', views.dashboard_view, name='dashboard_chat'),
     path('dashboard/group/<int:group_id>/', views.dashboard_view, name='dashboard_group_chat'),
-    
+    path('group/<int:group_id>/upload-file/', views.upload_project_file, name='upload_project_file'),
+    path('group/<int:group_id>/files/', views.list_project_files, name='list_project_files'),
+    path('file/<int:file_id>/content/', views.get_file_content, name='get_file_content'),
+
     # Group Management
     path('create-group/', views.create_group_view, name='create_group'),
     path('group/<int:group_id>/edit/', views.edit_group_view, name='edit_group'),

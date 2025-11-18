@@ -445,6 +445,11 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.workspace_key = self.scope['url_route']['kwargs']['workspace_key']
         self.room_group_name = f'workspace_{self.workspace_key}'
+        self.user = self.scope['user']
+
+        if not self.user.is_authenticated:
+            await self.close()
+            return
 
         await self.channel_layer.group_add(
             self.room_group_name,
@@ -459,5 +464,157 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
         )
 
     async def receive(self, text_data):
-        # Placeholder for workspace logic
-        pass
+        data = json.loads(text_data)
+        message_type = data.get('type')
+
+        if message_type == 'list_files':
+            files = await self.get_files()
+            await self.send(text_data=json.dumps({
+                'type': 'file_list',
+                'files': files
+            }))
+
+        elif message_type == 'create_node':
+            name = data.get('name')
+            node_type = data.get('node_type')
+            parent_id = data.get('parent_id')
+            
+            if name and node_type:
+                new_node = await self.create_node(name, node_type, parent_id)
+                if new_node:
+                    await self.broadcast_file_list()
+
+        elif message_type == 'read_file':
+            node_id = data.get('node_id')
+            if node_id:
+                content, language = await self.read_file_content(node_id)
+                await self.send(text_data=json.dumps({
+                    'type': 'file_content',
+                    'node_id': node_id,
+                    'content': content,
+                    'language': language
+                }))
+
+        elif message_type == 'write_file':
+            node_id = data.get('node_id')
+            content = data.get('content')
+            if node_id is not None:
+                await self.update_file_content(node_id, content)
+                # Broadcast update to others, excluding sender if possible, 
+                # but for simplicity we broadcast to group and frontend handles it.
+                # Ideally, we send a specific 'file_update' event.
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'file_updated',
+                        'node_id': node_id,
+                        'content': content,
+                        'sender_channel_name': self.channel_name
+                    }
+                )
+
+        elif message_type == 'delete_node':
+            node_id = data.get('node_id')
+            if node_id:
+                await self.delete_node(node_id)
+                await self.broadcast_file_list()
+
+    async def file_updated(self, event):
+        # Don't echo back to the sender to avoid cursor jumps/conflicts if possible
+        if self.channel_name != event.get('sender_channel_name'):
+            await self.send(text_data=json.dumps({
+                'type': 'file_update',
+                'node_id': event['node_id'],
+                'content': event['content']
+            }))
+
+    async def broadcast_file_list(self):
+        files = await self.get_files()
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'send_file_list',
+                'files': files
+            }
+        )
+
+    async def send_file_list(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'file_list',
+            'files': event['files']
+        }))
+
+    @database_sync_to_async
+    def get_files(self):
+        from .models import WorkspaceNode
+        nodes = WorkspaceNode.objects.filter(workspace_key=self.workspace_key).order_by('node_type', 'name')
+        return [
+            {
+                'id': node.id,
+                'name': node.name,
+                'type': node.node_type,
+                'parent_id': node.parent.id if node.parent else None,
+                'language': node.language
+            }
+            for node in nodes
+        ]
+
+    @database_sync_to_async
+    def create_node(self, name, node_type, parent_id):
+        from .models import WorkspaceNode
+        parent = None
+        if parent_id:
+            try:
+                parent = WorkspaceNode.objects.get(id=parent_id, workspace_key=self.workspace_key)
+            except WorkspaceNode.DoesNotExist:
+                return None
+        
+        # Simple language detection based on extension
+        language = 'text'
+        if node_type == 'file':
+            if name.endswith('.py'): language = 'python'
+            elif name.endswith('.html'): language = 'html'
+            elif name.endswith('.js'): language = 'javascript'
+            elif name.endswith('.css'): language = 'css'
+            elif name.endswith('.json'): language = 'json'
+            elif name.endswith('.md'): language = 'markdown'
+
+        try:
+            return WorkspaceNode.objects.create(
+                workspace_key=self.workspace_key,
+                name=name,
+                node_type=node_type,
+                parent=parent,
+                language=language,
+                created_by=self.user
+            )
+        except Exception as e:
+            print(f"Error creating node: {e}")
+            return None
+
+    @database_sync_to_async
+    def read_file_content(self, node_id):
+        from .models import WorkspaceNode
+        try:
+            node = WorkspaceNode.objects.get(id=node_id, workspace_key=self.workspace_key)
+            return node.content, node.language
+        except WorkspaceNode.DoesNotExist:
+            return "", "text"
+
+    @database_sync_to_async
+    def update_file_content(self, node_id, content):
+        from .models import WorkspaceNode
+        try:
+            node = WorkspaceNode.objects.get(id=node_id, workspace_key=self.workspace_key)
+            node.content = content
+            node.save()
+        except WorkspaceNode.DoesNotExist:
+            pass
+
+    @database_sync_to_async
+    def delete_node(self, node_id):
+        from .models import WorkspaceNode
+        try:
+            WorkspaceNode.objects.filter(id=node_id, workspace_key=self.workspace_key).delete()
+        except Exception:
+            pass

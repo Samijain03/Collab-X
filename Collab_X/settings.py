@@ -12,7 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os  # <-- ADD THIS
-from dotenv import load_dotenv  # <-- ADD THIS
+from dotenv import load_dotenv  
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -30,10 +31,10 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = 'django-insecure-zik7rk)ip_ghw()=3ek)nd6he&k*fnj%y5%xhn7u*7*zj$1k!%'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [os.environ.get('ALLOWED_HOSTS')]
-
+CSRF_TRUSTED_ORIGINS = [f"https://{os.environ.get('ALLOWED_HOSTS')}"]
 
 # Application definition
 
@@ -54,6 +55,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'allauth.socialaccount.providers.google',
     'allauth.socialaccount.providers.microsoft',
+    'storages',
 ]
 SITE_ID = 1
 
@@ -99,10 +101,10 @@ WSGI_APPLICATION = 'Collab_X.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600
+    )
 }
 
 
@@ -164,6 +166,32 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 MEDIA_URL = '/media/'
+# In settings.py
+
+# --- Backblaze B2 (Private Bucket) Media Storage ---
+
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+# Get credentials from Render environment variables
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+
+# This is the critical part for Backblaze
+AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL')
+
+# Ensure new files don't overwrite old ones
+AWS_S3_FILE_OVERWRITE = False
+
+# --- NEW CHANGES FOR PRIVATE BUCKET ---
+
+# 1. Files are private by default
+AWS_DEFAULT_ACL = None  # Use None for private
+
+# 2. We MUST use query string auth to generate temporary links
+AWS_QUERYSTRING_AUTH = True
+
+# --- End of B2 Config ---
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # --- ADD THIS ---

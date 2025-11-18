@@ -4,16 +4,31 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
-from .forms import SignUpForm
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.contrib import messages
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 # --- UPDATED IMPORTS ---
 from .forms import (
     SignUpForm, ProfileUpdateForm, CreateGroupForm,
     ChangeGroupNameForm, AddGroupMemberForm, RemoveGroupMemberForm
 )
 from .models import ContactRequest, Profile, Message, Group, GroupMessage
+
+
+def _build_workspace_key(chat_type, current_user_id, chat_id):
+    if not chat_type or not chat_id:
+        return None
+    if chat_type == '1on1':
+        ordered = sorted([current_user_id, int(chat_id)])
+        return f"chat_{ordered[0]}_{ordered[1]}"
+    if chat_type == 'group':
+        return f"group_{chat_id}"
+    return None
 
 
 # Homepage View
@@ -75,6 +90,7 @@ def dashboard_view(request, contact_id=None, group_id=None):
         'messages': [],
         'chat_type': None,
         'chat_id': None,
+        'workspace_key': None,
     }
 
     if contact_id:
@@ -113,6 +129,12 @@ def dashboard_view(request, contact_id=None, group_id=None):
         except Group.DoesNotExist:
             messages.error(request, "Group not found.")
             return redirect('chatapp:dashboard')
+
+    context['workspace_key'] = _build_workspace_key(
+        context.get('chat_type'),
+        request.user.id,
+        context.get('chat_id')
+    )
 
     return render(request, 'chatapp/dashboard.html', context)
 # --- End of Replaced View ---
@@ -294,3 +316,80 @@ def remove_group_members_view(request, group_id):
     'button_text': 'Remove Members'
     }
     return render(request, 'chatapp/edit_group.html', context)
+
+
+@login_required
+@require_POST
+def upload_attachment_view(request, chat_type, chat_id):
+    if chat_type not in ('1on1', 'group'):
+        return HttpResponseBadRequest("Invalid chat type.")
+
+    uploaded_file = request.FILES.get('file')
+    caption = request.POST.get('caption', '').strip()
+
+    if not uploaded_file:
+        return HttpResponseBadRequest("No file provided.")
+
+    channel_layer = get_channel_layer()
+    timestamp = timezone.now().strftime("%I:%M %p")
+
+    if chat_type == '1on1':
+        contact_profile = get_object_or_404(Profile, user__id=chat_id)
+        user_profile = request.user.profile
+        if not user_profile.contacts.filter(user=contact_profile.user).exists():
+            return HttpResponseForbidden("Not allowed to upload in this chat.")
+
+        message = Message.objects.create(
+            sender=request.user,
+            receiver=contact_profile.user,
+            content=caption,
+            file=uploaded_file,
+            file_name=uploaded_file.name
+        )
+        room_key = _build_workspace_key('1on1', request.user.id, contact_profile.user.id)
+        event_payload = {
+            'type': 'chat_message',
+            'message_id': message.id,
+            'message': message.content,
+            'sender_username': request.user.username,
+            'timestamp': timestamp,
+            'attachment_url': message.file.url if message.file else '',
+            'attachment_name': message.file_name or uploaded_file.name,
+            'sender_display_name': request.user.profile.display_name or request.user.username,
+        }
+    else:
+        group = get_object_or_404(Group, id=chat_id)
+        if not group.members.filter(id=request.user.id).exists():
+            return HttpResponseForbidden("Not allowed to upload in this group.")
+
+        message = GroupMessage.objects.create(
+            group=group,
+            sender=request.user,
+            content=caption,
+            file=uploaded_file,
+            file_name=uploaded_file.name
+        )
+        room_key = _build_workspace_key('group', request.user.id, group.id)
+        event_payload = {
+            'type': 'group_chat_message',
+            'message_id': message.id,
+            'message': message.content,
+            'sender_username': request.user.username,
+            'timestamp': timestamp,
+            'attachment_url': message.file.url if message.file else '',
+            'attachment_name': message.file_name or uploaded_file.name,
+            'sender_display_name': request.user.profile.display_name or request.user.username,
+        }
+
+    async_to_sync(channel_layer.group_send)(
+        room_key,
+        event_payload
+    )
+
+    return JsonResponse({
+        'success': True,
+        'message_id': message.id,
+        'attachment_name': message.file_name or uploaded_file.name,
+        'attachment_url': message.file.url if message.file else '',
+        'timestamp': timestamp,
+    })

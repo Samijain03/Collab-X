@@ -15,6 +15,653 @@
         width: 100%;
         max-width: 380px;
         background: var(--card-bg);
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        transition: var(--transition);
+    }
+
+    .sidebar-header {
+        padding: 1.25rem;
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        color: var(--darker-bg);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .sidebar-header h5 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.25rem;
+        font-family: 'Fira Code', monospace;
+    }
+
+    .sidebar-header .btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: var(--darker-bg);
+        transition: var(--transition);
+    }
+
+    .sidebar-header .btn:hover {
+        background: rgba(255, 255, 255, 0.4);
+        transform: scale(1.1);
+    }
+
+    .search-wrapper {
+        padding: 1rem;
+        background-color: var(--dark-bg);
+        border-bottom: 1px solid var(--border-color);
+        position: relative;
+    }
+
+    .search-input {
+        border-radius: 2rem;
+        border: 1px solid var(--border-color);
+        padding: 0.75rem 1rem 0.75rem 2.5rem;
+        background-color: var(--darker-bg);
+        color: var(--text-primary);
+        transition: var(--transition);
+        font-family: 'JetBrains Mono', monospace;
+        width: 100%;
+    }
+
+    .search-input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.25rem rgba(0, 255, 159, 0.25);
+        background-color: var(--darker-bg);
+        outline: none;
+    }
+
+    .search-input::placeholder {
+        color: var(--text-secondary);
+    }
+
+    .search-wrapper i {
+        position: absolute;
+        left: 1.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+        z-index: 10;
+    }
+
+    /* Contact Requests */
+    .contact-requests {
+        padding: 1rem;
+        background: rgba(255, 0, 110, 0.1);
+        border-bottom: 1px solid var(--danger-color);
+    }
+
+    .contact-requests h6 {
+        color: var(--danger-color);
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        font-family: 'Fira Code', monospace;
+    }
+
+    .request-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background-color: var(--card-bg);
+        border-radius: 0.75rem;
+        margin-bottom: 0.5rem;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .request-item span {
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    .request-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .btn-success {
+        background: var(--primary-color);
+        border: none;
+        color: var(--darker-bg);
+        transition: var(--transition);
+    }
+
+    .btn-success:hover {
+        background: var(--primary-light);
+        transform: scale(1.05);
+    }
+
+    .btn-danger {
+        background: var(--danger-color);
+        border: none;
+        transition: var(--transition);
+    }
+
+    .btn-danger:hover {
+        background: #ff3388;
+        transform: scale(1.05);
+    }
+
+    /* Contact List */
+    .contact-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .contact-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        text-decoration: none;
+        color: var(--text-secondary);
+        transition: var(--transition);
+        position: relative;
+    }
+
+    .contact-item:hover {
+        background-color: var(--dark-bg);
+    }
+
+    .contact-item.active {
+        background: linear-gradient(90deg, rgba(0, 255, 159, 0.1) 0%, transparent 100%);
+        border-left: 4px solid var(--primary-color);
+    }
+
+    .contact-item.active:hover {
+        background: linear-gradient(90deg, rgba(0, 255, 159, 0.15) 0%, transparent 100%);
+    }
+
+    .contact-item img,
+    .contact-item .group-icon {
+        width: 56px;
+        height: 56px;
+        object-fit: cover;
+        border-radius: 50%;
+        flex-shrink: 0;
+        border: 2px solid var(--primary-color);
+    }
+
+    .contact-item .group-icon {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        color: var(--darker-bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.5rem;
+        font-family: 'Fira Code', monospace;
+        border: none;
+    }
+
+    .contact-info {
+        margin-left: 1rem;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .contact-info h6 {
+        margin: 0 0 0.25rem 0;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .contact-info small {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    /* Chat Area */
+    .chat-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--dark-bg);
+        position: relative;
+    }
+
+    .chat-area .loading-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(6, 11, 25, 0.92);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+    }
+
+    .workspace-panel {
+        width: 380px;
+        max-width: 420px;
+        background: var(--card-bg);
+        border-left: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        transition: var(--transition);
+    }
+
+    .workspace-panel.collapsed {
+        width: 60px;
+        min-width: 60px;
+    }
+
+    .workspace-panel.collapsed .workspace-body,
+    .workspace-panel.collapsed .workspace-header .d-flex {
+        display: none !important;
+    }
+
+    .workspace-header-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .workspace-collapse-btn {
+        border-color: rgba(255, 255, 255, 0.2);
+        color: var(--text-secondary);
+    }
+
+    .workspace-locked {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: var(--text-secondary);
+        padding: 2rem;
+    }
+
+    .workspace-locked i {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .workspace-header {
+        padding: 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, rgba(0, 255, 159, 0.08) 0%, rgba(0, 212, 255, 0.08) 100%);
+    }
+
+    .workspace-header h5 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    .workspace-header small {
+        color: var(--text-secondary);
+        font-size: 0.8rem;
+    }
+
+    .workspace-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .workspace-tree-container {
+        display: flex;
+        flex-direction: column;
+        border-bottom: 1px solid var(--border-color);
+        max-height: 50%;
+        overflow: hidden;
+    }
+
+    .workspace-tree-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .workspace-tree-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        letter-spacing: 0.5px;
+    }
+
+    .workspace-tree-actions {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .workspace-tree-actions .btn {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+    }
+
+    .workspace-tree-actions .btn:hover {
+        color: var(--primary-color);
+        background: rgba(0, 255, 159, 0.1);
+    }
+
+    .workspace-file-tree {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.25rem 0;
+    }
+
+    .workspace-tree-node {
+        display: flex;
+        align-items: center;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+    }
+
+    .workspace-tree-node:hover {
+        background: rgba(0, 255, 159, 0.05);
+    }
+
+    .workspace-tree-node.active {
+        background: rgba(0, 255, 159, 0.12);
+    }
+
+    .workspace-tree-node-icon {
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 0.25rem;
+        flex-shrink: 0;
+    }
+
+    .workspace-tree-node-name {
+        flex: 1;
+        font-size: 0.875rem;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .workspace-tree-node-children {
+        margin-left: 1rem;
+        display: none;
+    }
+
+    .workspace-tree-node.expanded>.workspace-tree-node-children {
+        display: block;
+    }
+
+    .workspace-tree-node.folder>.workspace-tree-node-icon {
+        color: var(--primary-color);
+    }
+
+    .workspace-tree-node.file>.workspace-tree-node-icon {
+        color: var(--text-secondary);
+    }
+
+    .workspace-file-list {
+        max-height: 180px;
+        overflow-y: auto;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .workspace-file-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.85rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .workspace-file-item.active,
+    .workspace-file-item:hover {
+        background: rgba(0, 255, 159, 0.08);
+    }
+
+    .workspace-file-item span {
+        font-weight: 500;
+    }
+
+    .workspace-editor {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 1rem;
+        overflow: hidden;
+    }
+
+    .workspace-editor textarea {
+        flex: 1;
+        resize: none;
+        border-radius: 0.75rem;
+        background: var(--darker-bg);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        padding: 1rem;
+        font-family: 'Fira Code', monospace;
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    .workspace-editor textarea:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .workspace-editor-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .workspace-editor-bar .badge {
+        background: rgba(0, 255, 159, 0.15);
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+    }
+
+    .workspace-editor-actions button {
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        margin-left: 0.5rem;
+        transition: var(--transition);
+    }
+
+    .workspace-editor-actions button:hover {
+        color: var(--primary-color);
+    }
+
+    .workspace-editor-controls {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        margin: 0.5rem 0;
+    }
+
+    .workspace-editor-controls .btn {
+        border-radius: 999px;
+        padding: 0.4rem 1.25rem;
+    }
+
+    .workspace-output {
+        background: var(--darker-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 0.75rem;
+        max-height: 220px;
+        overflow-y: auto;
+    }
+
+    .workspace-output-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .workspace-preview {
+        width: 100%;
+        min-height: 200px;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        margin-top: 0.75rem;
+        background: white;
+    }
+
+    .attachment-card {
+        margin-top: 0.75rem;
+        padding: 0.75rem;
+        border-radius: 0.75rem;
+        border: 1px dashed var(--primary-color);
+        background: rgba(0, 255, 159, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .attachment-card i {
+        font-size: 1.25rem;
+        color: var(--primary-color);
+    }
+
+    .chat-input .tool-btn {
+        border-radius: 50%;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+    }
+
+    .chat-input .tool-btn:hover {
+        color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+
+    .chat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .chat-header-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .chat-header img,
+    .chat-header .group-icon {
+        width: 48px;
+        height: 48px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 2px solid var(--primary-color);
+    }
+
+    .chat-header .group-icon {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        color: var(--darker-bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.25rem;
+        border: none;
+        font-family: 'Fira Code', monospace;
+    }
+
+    .chat-header-text h6 {
+        margin: 0 0 0.25rem 0;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .chat-header-text small {
+        color: var(--text-secondary);
+    }
+
+    .chat-header .dropdown-menu {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+    }
+
+    .chat-header .dropdown-item {
+        color: var(--text-primary);
+        transition: var(--transition);
+    }
+
+    .chat-header .dropdown-item:hover {
+        background: rgba(0, 255, 159, 0.1);
+        color: var(--primary-color);
+    }
+
+    /* Chat Messages */
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .message-bubble {
+        max-width: 70%;
+        padding: 0.75rem 1rem;
+        border-radius: 1rem;
+        word-wrap: break-word;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        animation: messageSlide 0.3s ease-out;
+        position: relative;
+        line-height: 1.5;
+    }
+
+    @keyframes messageSlide {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .message-bubble.sent {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+        color: var(--darker-bg);
+        align-self: flex-end;
+        border-bottom-right-radius: 0.25rem;
+    }
+
+    .message-bubble.sent .message-time {
+        color: var(--darker-bg);
+        opacity: 0.8;
     }
 
     .message-bubble.received {
@@ -27,15 +674,6 @@
 
     .message-bubble.received .message-time {
         color: var(--text-secondary);
-    }
-
-    .message-sender-name {
-        font-size: 0.7rem;
-        font-weight: 600;
-        color: rgba(255, 255, 255, 0.7);
-        margin-bottom: 0.1rem;
-        display: block;
-        margin-left: 0.2rem;
     }
 
     .message-bubble p {
@@ -423,73 +1061,6 @@
         min-height: 100px;
         border: 1px solid #333;
     }
-
-    /* Workspace Panel */
-    .workspace-panel {
-        width: 0;
-        background: var(--card-bg);
-        border-left: 1px solid var(--border-color);
-        transition: var(--transition);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    }
-
-    .workspace-panel.open {
-        width: 350px;
-    }
-
-    .workspace-header {
-        padding: 1rem;
-        border-bottom: 1px solid var(--border-color);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: rgba(0, 255, 159, 0.05);
-    }
-
-    .workspace-header h6 {
-        margin: 0;
-        font-weight: 700;
-        color: var(--primary-color);
-        font-family: 'Fira Code', monospace;
-    }
-
-    .file-tree {
-        flex: 1;
-        overflow-y: auto;
-        padding: 0.5rem;
-    }
-
-    .file-node {
-        padding: 0.25rem 0.5rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        color: var(--text-secondary);
-        border-radius: 0.25rem;
-    }
-
-    .file-node:hover {
-        background: rgba(255, 255, 255, 0.05);
-        color: var(--text-primary);
-    }
-
-    .file-node.active {
-        background: rgba(0, 255, 159, 0.1);
-        color: var(--primary-color);
-    }
-
-    .file-node i {
-        margin-right: 0.5rem;
-    }
-
-    .workspace-actions {
-        padding: 0.5rem;
-        border-top: 1px solid var(--border-color);
-        display: flex;
-        gap: 0.5rem;
-    }
 </style>
 {% endblock %}
 
@@ -501,9 +1072,6 @@
         <div class="sidebar-header">
             <h5><i class="bi bi-terminal me-2"></i>Messages</h5>
             <div>
-                <button class="btn btn-sm" id="toggle-workspace-panel" title="Toggle Workspace">
-                    <i class="bi bi-folder2-open fs-5"></i>
-                </button>
                 <button class="btn btn-sm" id="toggle-code-panel" title="Toggle Code Playground">
                     <i class="bi bi-code-slash fs-5"></i>
                 </button>
@@ -578,10 +1146,9 @@
 
             <div class="section-header">
                 <h6><i class="bi bi-people-fill me-2"></i>Groups</h6>
-                <button class="btn btn-primary btn-sm" title="Create Group" data-bs-toggle="modal"
-                    data-bs-target="#createGroupModal">
+                <a href="{% url 'chatapp:create_group' %}" class="btn btn-primary btn-sm" title="Create Group">
                     <i class="bi bi-plus-lg"></i>
-                </button>
+                </a>
             </div>
             {% for group in groups %}
             <a href="{% url 'chatapp:dashboard_group_chat' group.id %}"
@@ -589,8 +1156,7 @@
                 <div class="group-icon">{{ group.name|first|upper }}</div>
                 <div class="contact-info">
                     <h6>{{ group.name }}</h6>
-                    <small>{{ group.members.count }} member{{ group.members.count|pluralize
-                        }}</small>
+                    <small>{{ group.members.count }} member{{ group.members.count|pluralize }}</small>
                 </div>
             </a>
             {% empty %}
@@ -612,16 +1178,14 @@
                         alt="{{ selected_contact.display_name|default:selected_contact.user.username }}">
                 </a>
                 <div class="chat-header-text">
-                    <h6>{{ selected_contact.display_name|default:selected_contact.user.username }}
-                    </h6>
+                    <h6>{{ selected_contact.display_name|default:selected_contact.user.username }}</h6>
                     <small>@{{ selected_contact.user.username }}</small>
                 </div>
                 {% elif selected_group %}
                 <div class="group-icon">{{ selected_group.name|first|upper }}</div>
                 <div class="chat-header-text">
                     <h6>{{ selected_group.name }}</h6>
-                    <small>{{ selected_group.members.count }} member{{
-                        selected_group.members.count|pluralize }}</small>
+                    <small>{{ selected_group.members.count }} member{{ selected_group.members.count|pluralize }}</small>
                 </div>
                 {% endif %}
             </div>
@@ -644,58 +1208,73 @@
                         </a></li>
                 </ul>
             </div>
-            <i class="bi bi-chat-dots"></i>
-            <p>Select a chat to start messaging</p>
+            {% endif %}
         </div>
-        {% endif %}
 
-        {% if selected_contact or selected_group %}
-        <div class="chat-input-area">
-            <form id="chat-form">
-                <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i></button>
+        <div class="chat-messages" id="chat-messages">
+            {% for message in messages %}
+            <div class="message-bubble {% if message.sender == user %}sent{% else %}received{% endif %}"
+                data-message-id="{{ message.id }}">
+                {% if message.is_deleted %}
+                <p class="fst-italic" style="opacity: 0.7;">This message was deleted.</p>
+                {% else %}
+                {% if selected_group and message.sender != user %}
+                <small class="fw-bold d-block mb-1" style="color: var(--primary-light);">{{
+                    message.sender.profile.display_name|default:message.sender.username }}</small>
+                {% endif %}
+                <p>{{ message.content }}</p>
+                {% if message.sender == user %}
+                <button class="btn btn-danger btn-sm delete-msg-btn float-end" title="Delete message">
+                    <i class="bi bi-trash"></i>
+                </button>
+                {% endif %}
+                {% endif %}
+                <span class="message-time">{{ message.timestamp|date:"h:i A" }}</span>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted my-4">
+                <i class="bi bi-chat-quote" style="font-size: 3rem; opacity: 0.3;"></i>
+                <p class="mt-2">Start the conversation</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="chat-input">
+            <form class="input-group" id="chat-form">
+                <input type="text" id="message-input" class="form-control"
+                    placeholder="Type a message... (Use /Collab for AI)" required>
+                <button class="btn btn-primary ms-2" type="submit">
+                    <i class="bi bi-send-fill"></i>
+                </button>
             </form>
+        </div>
+        {% else %}
+        <div class="placeholder-area">
+            <div>
+                <i class="bi bi-chat-heart-fill"></i>
+                <h3>Welcome to &lt;Collab-X/&gt;</h3>
+                <p>Select a contact or group to start messaging</p>
+            </div>
         </div>
         {% endif %}
     </div>
 
-    <div class="code-playground-panel" id="code-playground-panel">
+    <div class="code-panel" id="code-panel">
         <div class="code-header">
-            <h6><i class="bi bi-code-slash me-2"></i>Code Playground</h6>
-            <button class="btn btn-sm btn-primary" id="run-code-btn" title="Run Code">
-                <i class="bi bi-play-fill"></i> Run
+            <h6><i class="bi bi-code-square me-2"></i>Code Playground</h6>
+            <button class="btn btn-sm btn-outline-danger" id="close-code-panel">
+                <i class="bi bi-x-lg"></i>
             </button>
         </div>
         <div class="code-editor-container">
-            <textarea id="code-textarea" class="code-textarea" placeholder="Write your code here..."></textarea>
-            <div id="code-output" class="output-area"></div>
-        </div>
-    </div>
-
-    <div class="workspace-panel" id="workspace-panel">
-        <div class="workspace-header">
-            <h6><i class="bi bi-folder2-open me-2"></i>Workspace</h6>
-            <div class="dropdown">
-                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"
-                    aria-expanded="false">
-                    <i class="bi bi-plus-lg"></i> New
-                </button>
-                <ul class="dropdown-menu dropdown-menu-dark">
-                    <li><a class="dropdown-item" href="#" id="create-file-btn"><i
-                                class="bi bi-file-earmark-plus me-2"></i>New File</a></li>
-                    <li><a class="dropdown-item" href="#" id="create-folder-btn"><i
-                                class="bi bi-folder-plus me-2"></i>New Folder</a></li>
-                </ul>
+            <textarea id="code-input" class="code-textarea" placeholder="# Write Python code here..."></textarea>
+            <button class="btn btn-primary w-100" id="run-code-btn">
+                <i class="bi bi-play-fill me-2"></i>Run Code
+            </button>
+            <div>
+                <small class="text-muted mb-2 d-block">Output:</small>
+                <div id="code-output" class="output-area">// Output will appear here...</div>
             </div>
-        </div>
-        <div class="file-tree" id="file-tree">
-            <!-- File nodes will be loaded here -->
-        </div>
-        <div class="workspace-actions">
-            <button class="btn btn-sm btn-danger flex-grow-1" id="delete-node-btn" disabled><i
-                    class="bi bi-trash me-2"></i>Delete</button>
-            <button class="btn btn-sm btn-secondary flex-grow-1" id="rename-node-btn" disabled><i
-                    class="bi bi-pencil me-2"></i>Rename</button>
         </div>
     </div>
 </div>
@@ -704,356 +1283,131 @@
     <i class="bi bi-list"></i>
 </button>
 <div class="mobile-overlay" id="mobileOverlay"></div>
-
-<!-- Create Group Modal -->
-<div class="modal fade" id="createGroupModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="background: var(--card-bg); border: 1px solid var(--border-color);">
-            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
-                <h5 class="modal-title" style="color: var(--text-primary); font-family: 'Fira Code', monospace;">
-                    <i class="bi bi-people-fill me-2"></i>Create Group
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                    aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="create-group-form">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="group-name" class="form-label" style="color: var(--text-secondary);">Group
-                            Name</label>
-                        <input type="text" class="form-control" id="group-name" name="name" required
-                            style="background: var(--darker-bg); color: var(--text-primary); border: 1px solid var(--border-color);">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" style="color: var(--text-secondary);">Select
-                            Members</label>
-                        <div class="list-group" style="max-height: 200px; overflow-y: auto;">
-                            {% for contact in contacts %}
-                            <label class="list-group-item d-flex gap-2"
-                                style="background: var(--darker-bg); color: var(--text-primary); border: 1px solid var(--border-color);">
-                                <input class="form-check-input flex-shrink-0" type="checkbox" name="members"
-                                    value="{{ contact.user.id }}">
-                                <span>
-                                    {{ contact.display_name|default:contact.user.username }}
-                                    <small class="text-muted d-block">@{{ contact.user.username
-                                        }}</small>
-                                </span>
-                            </label>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Create Group</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const chatContainer = document.querySelector('.chat-container');
-        const chatType = chatContainer.dataset.chatType;
-        const chatId = chatContainer.dataset.chatId;
-        const workspaceKey = chatContainer.dataset.workspaceKey;
-        const currentUsername = chatContainer.dataset.currentUsername;
-        const botAvatar = chatContainer.dataset.botAvatar;
-
         const chatMessages = document.getElementById('chat-messages');
-        const messageInput = document.getElementById('message-input');
         const chatForm = document.getElementById('chat-form');
-        const codeInput = document.getElementById('code-textarea');
-        const codeOutput = document.getElementById('code-output');
+        const messageInput = document.getElementById('message-input');
+        const mobileToggle = document.getElementById('mobileToggle');
+        const mobileOverlay = document.getElementById('mobileOverlay');
+        const sidebar = document.getElementById('sidebar');
+
+        // Code Panel Elements
+        const codePanel = document.getElementById('code-panel');
+        const toggleCodeBtn = document.getElementById('toggle-code-panel');
+        const closeCodeBtn = document.getElementById('close-code-panel');
         const runCodeBtn = document.getElementById('run-code-btn');
+        const codeInput = document.getElementById('code-input');
+        const codeOutput = document.getElementById('code-output');
+
+        let chatSocket = null;
+
+        // Scroll to bottom
+        if (chatMessages) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Mobile sidebar toggle
+        if (mobileToggle) {
+            mobileToggle.addEventListener('click', function () {
+                sidebar.classList.toggle('show');
+                mobileOverlay.classList.toggle('show');
+            });
+
+            mobileOverlay.addEventListener('click', function () {
+                sidebar.classList.remove('show');
+                mobileOverlay.classList.remove('show');
+            });
+        }
+
+        // Code Panel Toggle Logic
+        if (toggleCodeBtn && codePanel) {
+            toggleCodeBtn.addEventListener('click', function () {
+                codePanel.classList.toggle('open');
+            });
+        }
+
+        if (closeCodeBtn && codePanel) {
+            closeCodeBtn.addEventListener('click', function () {
+                codePanel.classList.remove('open');
+            });
+        }
 
         // WebSocket setup
-        let chatSocket = null;
-        let workspaceSocket = null;
+        const chatType = "{{ chat_type|default:'' }}";
+        const chatId = "{{ chat_id|default:'' }}";
+        const currentUsername = "{{ user.username }}";
 
         if (chatType && chatId) {
-            chatSocket = new WebSocket(
-                'ws://' + window.location.host +
-                '/ws/chat/' + chatType + '/' + chatId + '/'
-            );
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = chatType === '1on1'
+                ? `${wsProtocol}//${window.location.host}/ws/chat/${chatId}/`
+                : `${wsProtocol}//${window.location.host}/ws/group/${chatId}/`;
+
+            chatSocket = new WebSocket(wsUrl);
 
             chatSocket.onmessage = function (e) {
                 const data = JSON.parse(e.data);
-                console.log('Chat Socket Message:', data);
 
                 if (data.type === 'chat_message') {
                     const isSent = data.sender_username === currentUsername;
-                    const senderDisplayName = data.sender_display_name;
-                    const bubble = createMessageBubble(data.message, data.timestamp, isSent, senderDisplayName, data.message_id);
+                    const bubble = createMessageBubble(
+                        data.content,
+                        data.timestamp,
+                        isSent,
+                        chatType === 'group' ? data.sender_display_name : null,
+                        data.message_id
+                    );
                     chatMessages.appendChild(bubble);
                     chatMessages.scrollTop = chatMessages.scrollHeight;
-                } else if (data.type === 'bot_message') {
-                    const botBubble = createBotMessageBubble(data.message, data.sender_username, data.jump_id, data.request_id);
-                    chatMessages.appendChild(botBubble);
+                }
+                else if (data.type === 'message_deleted') {
+                    const bubble = document.querySelector(`.message-bubble[data-message-id='${data.message_id}']`);
+                    if (bubble) {
+                        bubble.innerHTML = `
+                        <p class="fst-italic" style="opacity: 0.7;">This message was deleted.</p>
+                        <span class="message-time"></span>
+                    `;
+                    }
+                }
+                else if (data.type === 'bot_message') {
+                    if (data.status === 'thinking') {
+                        const bubble = createBotMessageBubble(data.content, data.sender_username, null, data.request_id);
+                        chatMessages.appendChild(bubble);
+                    } else if (data.status === 'complete') {
+                        const existingBubble = document.getElementById(`bot-response-${data.request_id}`);
+                        if (existingBubble) {
+                            const contentP = existingBubble.querySelector(`#bot-content-${data.request_id}`);
+                            if (contentP) contentP.textContent = data.content;
+
+                            if (data.jump_id) {
+                                const jumpContainer = existingBubble.querySelector(`#bot-jump-${data.request_id}`);
+                                if (jumpContainer) {
+                                    jumpContainer.innerHTML = '';
+                                    const jumpBtn = document.createElement('button');
+                                    jumpBtn.className = 'jump-btn';
+                                    jumpBtn.textContent = 'Jump to message';
+                                    jumpBtn.dataset.jumpId = data.jump_id;
+                                    jumpContainer.appendChild(jumpBtn);
+                                }
+                            }
+                        }
+                    }
                     chatMessages.scrollTop = chatMessages.scrollHeight;
-                } else if (data.type === 'bot_message_update') {
-                    const botContent = document.getElementById(`bot-content-${data.request_id}`);
-                    if (botContent) {
-                        botContent.textContent = data.message;
+                }
+                else if (data.type === 'execution_result') {
+                    if (codeOutput) {
+                        codeOutput.textContent = data.output;
                     }
-                    const botJumpContainer = document.getElementById(`bot-jump-${data.request_id}`);
-                    if (botJumpContainer && data.jump_id && !botJumpContainer.querySelector('.jump-btn')) {
-                        const jumpBtn = document.createElement('button');
-                        jumpBtn.className = 'jump-btn';
-                        jumpBtn.textContent = 'Jump to message';
-                        jumpBtn.dataset.jumpId = data.jump_id;
-                        botJumpContainer.appendChild(jumpBtn);
-                    }
-                } else if (data.type === 'message_deleted') {
-                    const messageBubble = document.querySelector(`.message-bubble[data-message-id='${data.message_id}']`);
-                    if (messageBubble) {
-                        messageBubble.remove();
-                    }
-                } else if (data.type === 'code_output') {
-                    codeOutput.textContent = data.output;
                 }
             };
 
             chatSocket.onclose = function (e) {
-                console.error('Chat socket closed unexpectedly');
+                console.error('WebSocket closed', e);
             };
-        }
-
-        if (workspaceKey) {
-            workspaceSocket = new WebSocket(
-                'ws://' + window.location.host +
-                '/ws/workspace/' + workspaceKey + '/'
-            );
-
-            workspaceSocket.onmessage = function (e) {
-                const data = JSON.parse(e.data);
-                console.log('Workspace Socket Message:', data);
-
-                if (data.type === 'workspace_init' || data.type === 'node_created' || data.type === 'node_deleted' || data.type === 'node_renamed') {
-                    renderFileTree(data.tree);
-                    if (data.type === 'node_created' && data.node.node_type === 'file') {
-                        // Automatically open new files
-                        openFile(data.node.id, data.node.name, data.node.content);
-                    }
-                } else if (data.type === 'file_content') {
-                    if (data.node_id === activeFileId) {
-                        codeInput.value = data.content;
-                    }
-                } else if (data.type === 'file_updated') {
-                    if (data.node_id === activeFileId) {
-                        // Only update if the change didn't originate from this client
-                        // (simple check, could be improved with client-side tracking)
-                        if (codeInput.value !== data.content) {
-                            codeInput.value = data.content;
-                        }
-                    }
-                }
-            };
-
-            workspaceSocket.onclose = function (e) {
-                console.error('Workspace socket closed unexpectedly');
-            };
-        }
-
-        // Sidebar Toggles
-        const sidebar = document.getElementById('sidebar');
-        const mobileToggle = document.getElementById('mobileToggle');
-        const mobileOverlay = document.getElementById('mobileOverlay');
-
-        mobileToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('open');
-            mobileOverlay.classList.toggle('active');
-        });
-
-        mobileOverlay.addEventListener('click', () => {
-            sidebar.classList.remove('open');
-            mobileOverlay.classList.remove('active');
-        });
-
-        // Code Playground Toggle
-        const toggleCodePanelBtn = document.getElementById('toggle-code-panel');
-        const codePlaygroundPanel = document.getElementById('code-playground-panel');
-
-        toggleCodePanelBtn.addEventListener('click', () => {
-            codePlaygroundPanel.classList.toggle('open');
-        });
-
-        // Workspace Panel Toggle
-        const toggleWorkspacePanelBtn = document.getElementById('toggle-workspace-panel');
-        const workspacePanel = document.getElementById('workspace-panel');
-
-        toggleWorkspacePanelBtn.addEventListener('click', () => {
-            workspacePanel.classList.toggle('open');
-        });
-
-        // File Tree Logic
-        const fileTreeContainer = document.getElementById('file-tree');
-        let activeFileId = null;
-
-        function renderFileTree(nodes, parentElement = fileTreeContainer) {
-            if (parentElement === fileTreeContainer) {
-                parentElement.innerHTML = ''; // Clear existing tree for re-render
-            }
-
-            nodes.sort((a, b) => {
-                if (a.node_type === 'folder' && b.node_type === 'file') return -1;
-                if (a.node_type === 'file' && b.node_type === 'folder') return 1;
-                return a.name.localeCompare(b.name);
-            });
-
-            nodes.forEach(node => {
-                const nodeElement = document.createElement('div');
-                nodeElement.className = `file-node ${node.node_type}`;
-                nodeElement.dataset.nodeId = node.id;
-                nodeElement.dataset.nodeType = node.node_type;
-                nodeElement.dataset.nodeName = node.name;
-
-                const icon = document.createElement('i');
-                icon.className = node.node_type === 'folder' ? 'bi bi-folder-fill' : 'bi bi-file-earmark';
-                nodeElement.appendChild(icon);
-
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = node.name;
-                nodeElement.appendChild(nameSpan);
-
-                if (node.id === activeFileId) {
-                    nodeElement.classList.add('active');
-                }
-
-                parentElement.appendChild(nodeElement);
-
-                if (node.children && node.children.length > 0) {
-                    const childrenContainer = document.createElement('div');
-                    childrenContainer.className = 'file-node-children';
-                    childrenContainer.style.paddingLeft = '1rem';
-                    nodeElement.appendChild(childrenContainer);
-                    renderFileTree(node.children, childrenContainer);
-                }
-            });
-        }
-
-        function openFile(fileId, fileName, content) {
-            activeFileId = fileId;
-            codeInput.value = content;
-            document.querySelectorAll('.file-node').forEach(node => node.classList.remove('active'));
-            document.querySelector(`.file-node[data-node-id='${fileId}']`).classList.add('active');
-            // Optionally update header or title
-        }
-
-        // File tree click handler
-        fileTreeContainer.addEventListener('click', function (e) {
-            const nodeElement = e.target.closest('.file-node');
-            if (nodeElement) {
-                const nodeId = nodeElement.dataset.nodeId;
-                const nodeType = nodeElement.dataset.nodeType;
-                const nodeName = nodeElement.dataset.nodeName;
-
-                // Enable/disable delete/rename buttons
-                document.getElementById('delete-node-btn').disabled = false;
-                document.getElementById('rename-node-btn').disabled = false;
-
-                if (nodeType === 'file') {
-                    if (workspaceSocket && nodeId) {
-                        workspaceSocket.send(JSON.stringify({
-                            type: 'read_file',
-                            node_id: nodeId
-                        }));
-                        openFile(nodeId, nodeName, ''); // Content will be filled by socket response
-                    }
-                } else if (nodeType === 'folder') {
-                    // Handle folder click (e.g., expand/collapse)
-                    // For now, just activate it
-                    document.querySelectorAll('.file-node').forEach(node => node.classList.remove('active'));
-                    nodeElement.classList.add('active');
-                    activeFileId = null; // No file is active if a folder is selected
-                    codeInput.value = ''; // Clear code editor
-                }
-            }
-        });
-
-        // Create File/Folder
-        document.getElementById('create-file-btn').addEventListener('click', function () {
-            const name = prompt('Enter new file name:');
-            if (name && workspaceSocket) {
-                const parentNode = document.querySelector('.file-node.active[data-node-type="folder"]');
-                const parentId = parentNode ? parentNode.dataset.nodeId : null;
-                workspaceSocket.send(JSON.stringify({
-                    type: 'create_node',
-                    name: name,
-                    node_type: 'file',
-                    parent_id: parentId
-                }));
-            }
-        });
-
-        document.getElementById('create-folder-btn').addEventListener('click', function () {
-            const name = prompt('Enter new folder name:');
-            if (name && workspaceSocket) {
-                const parentNode = document.querySelector('.file-node.active[data-node-type="folder"]');
-                const parentId = parentNode ? parentNode.dataset.nodeId : null;
-                workspaceSocket.send(JSON.stringify({
-                    type: 'create_node',
-                    name: name,
-                    node_type: 'folder',
-                    parent_id: parentId
-                }));
-            }
-        });
-
-        // Delete Node
-        document.getElementById('delete-node-btn').addEventListener('click', function () {
-            const activeNode = document.querySelector('.file-node.active');
-            if (activeNode && confirm(`Are you sure you want to delete "${activeNode.dataset.nodeName}"?`)) {
-                if (workspaceSocket) {
-                    workspaceSocket.send(JSON.stringify({
-                        type: 'delete_node',
-                        node_id: activeNode.dataset.nodeId
-                    }));
-                    if (activeNode.dataset.nodeId === activeFileId) {
-                        activeFileId = null;
-                        codeInput.value = '';
-                    }
-                    document.getElementById('delete-node-btn').disabled = true;
-                    document.getElementById('rename-node-btn').disabled = true;
-                }
-            }
-        });
-
-        // Rename Node
-        document.getElementById('rename-node-btn').addEventListener('click', function () {
-            const activeNode = document.querySelector('.file-node.active');
-            if (activeNode) {
-                const newName = prompt(`Rename "${activeNode.dataset.nodeName}" to:`, activeNode.dataset.nodeName);
-                if (newName && newName !== activeNode.dataset.nodeName && workspaceSocket) {
-                    workspaceSocket.send(JSON.stringify({
-                        type: 'rename_node',
-                        node_id: activeNode.dataset.nodeId,
-                        new_name: newName
-                    }));
-                }
-            }
-        });
-
-        // Real-time Editing
-        if (codeInput) {
-            let timeout = null;
-            codeInput.addEventListener('input', function () {
-                if (activeFileId && workspaceSocket) {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => {
-                        workspaceSocket.send(JSON.stringify({
-                            type: 'write_file',
-                            node_id: activeFileId,
-                            content: codeInput.value
-                        }));
-                    }, 500); // Debounce 500ms
-                }
-            });
         }
 
         // Send message
@@ -1134,8 +1488,9 @@
             bubble.dataset.messageId = messageId;
 
             if (senderDisplayName && !isSent) {
-                const sender = document.createElement('span');
-                sender.className = 'message-sender-name';
+                const sender = document.createElement('small');
+                sender.className = 'fw-bold d-block mb-1';
+                sender.style.color = 'var(--primary-light)';
                 sender.textContent = senderDisplayName;
                 bubble.appendChild(sender);
             }
@@ -1214,69 +1569,6 @@
 
                     item.style.display = text.includes(filter) ? 'flex' : 'none';
                 });
-            });
-        }
-
-        // Dynamic Contact Requests
-        document.querySelectorAll('.contact-requests .btn').forEach(btn => {
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                const url = this.getAttribute('href');
-                const requestItem = this.closest('.request-item');
-
-                fetch(url, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            requestItem.remove();
-                            // If accepting, reload to show new contact (or dynamically add it - simplified for now)
-                            if (url.includes('accept')) {
-                                window.location.reload();
-                            }
-                            // Check if no more requests, hide section
-                            if (document.querySelectorAll('.request-item').length === 0) {
-                                document.querySelector('.contact-requests').remove();
-                            }
-                        } else {
-                            alert(data.message);
-                        }
-                    })
-                    .catch(err => console.error('Error:', err));
-            });
-        });
-
-        // Dynamic Group Creation
-        const createGroupForm = document.getElementById('create-group-form');
-        if (createGroupForm) {
-            createGroupForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                const formData = new FormData(this);
-
-                fetch("{% url 'chatapp:create_group' %}", {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            // Close modal
-                            const modal = bootstrap.Modal.getInstance(document.getElementById('createGroupModal'));
-                            modal.hide();
-                            this.reset();
-                            // Redirect to new group
-                            window.location.href = `/dashboard/group/${data.group.id}/`;
-                        } else {
-                            alert('Error creating group: ' + JSON.stringify(data.errors));
-                        }
-                    })
-                    .catch(err => console.error('Error:', err));
             });
         }
     });

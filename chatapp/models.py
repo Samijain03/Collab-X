@@ -84,23 +84,48 @@ class GroupMessage(models.Model):
         return f'{self.sender.username} in {self.group.name}: {self.content[:20]}'
 
 
-class WorkspaceFile(models.Model):
+class WorkspaceNode(models.Model):
+    class NodeType(models.TextChoices):
+        FILE = 'file', 'File'
+        FOLDER = 'folder', 'Folder'
+
     LANGUAGE_CHOICES = (
         ('python', 'Python'),
         ('html', 'HTML'),
+        ('javascript', 'JavaScript'),
+        ('css', 'CSS'),
+        ('text', 'Text'),
+        ('json', 'JSON'),
+        ('markdown', 'Markdown'),
     )
 
     workspace_key = models.CharField(max_length=64, db_index=True)
     name = models.CharField(max_length=120)
-    language = models.CharField(max_length=12, choices=LANGUAGE_CHOICES)
+    node_type = models.CharField(max_length=12, choices=NodeType.choices)
+    language = models.CharField(max_length=20, choices=LANGUAGE_CHOICES, blank=True, null=True)
     content = models.TextField(blank=True)
-    created_by = models.ForeignKey(User, related_name='workspace_files', on_delete=models.CASCADE)
+    parent = models.ForeignKey('self', related_name='children', null=True, blank=True, on_delete=models.CASCADE)
+    position = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey(User, related_name='workspace_nodes', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('workspace_key', 'name')
-        ordering = ['name']
+        unique_together = ('workspace_key', 'parent', 'name')
+        ordering = ['position', 'name']
 
     def __str__(self):
-        return f'{self.workspace_key}::{self.name}'
+        return f'{self.workspace_key}::{self.full_path}'
+
+    @property
+    def is_file(self):
+        return self.node_type == self.NodeType.FILE
+
+    @property
+    def full_path(self):
+        parts = [self.name]
+        parent = self.parent
+        while parent:
+            parts.append(parent.name)
+            parent = parent.parent
+        return "/".join(reversed(parts))

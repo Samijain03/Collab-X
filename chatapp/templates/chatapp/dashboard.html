@@ -309,6 +309,108 @@
         overflow: hidden;
     }
 
+    .workspace-tree-container {
+        display: flex;
+        flex-direction: column;
+        border-bottom: 1px solid var(--border-color);
+        max-height: 50%;
+        overflow: hidden;
+    }
+
+    .workspace-tree-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .workspace-tree-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        letter-spacing: 0.5px;
+    }
+
+    .workspace-tree-actions {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .workspace-tree-actions .btn {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+    }
+
+    .workspace-tree-actions .btn:hover {
+        color: var(--primary-color);
+        background: rgba(0, 255, 159, 0.1);
+    }
+
+    .workspace-file-tree {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.25rem 0;
+    }
+
+    .workspace-tree-node {
+        display: flex;
+        align-items: center;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+    }
+
+    .workspace-tree-node:hover {
+        background: rgba(0, 255, 159, 0.05);
+    }
+
+    .workspace-tree-node.active {
+        background: rgba(0, 255, 159, 0.12);
+    }
+
+    .workspace-tree-node-icon {
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 0.25rem;
+        flex-shrink: 0;
+    }
+
+    .workspace-tree-node-name {
+        flex: 1;
+        font-size: 0.875rem;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .workspace-tree-node-children {
+        margin-left: 1rem;
+        display: none;
+    }
+
+    .workspace-tree-node.expanded > .workspace-tree-node-children {
+        display: block;
+    }
+
+    .workspace-tree-node.folder > .workspace-tree-node-icon {
+        color: var(--primary-color);
+    }
+
+    .workspace-tree-node.file > .workspace-tree-node-icon {
+        color: var(--text-secondary);
+    }
+
     .workspace-file-list {
         max-height: 180px;
         overflow-y: auto;

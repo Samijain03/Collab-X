@@ -2,9 +2,11 @@
     const state = {
         chatSocket: null,
         workspaceSocket: null,
-        workspaceFiles: new Map(),
-        activeWorkspaceFile: null,
+        workspaceNodes: new Map(),
+        workspaceTree: null,
+        activeWorkspaceNode: null,
         workspaceSaveTimer: null,
+        expandedFolders: new Set(),
         chatUI: null,
         workspaceUI: null,
     };
@@ -58,7 +60,10 @@
             currentUsername: container.dataset.currentUsername || '',
             uploadUrl: document.getElementById('chat-form')?.dataset.uploadUrl || '',
             workspacePanel: document.getElementById('workspacePanel'),
-            workspaceList: document.getElementById('workspace-file-list'),
+            workspaceTree: document.getElementById('workspace-file-tree'),
+            workspaceNewFileBtn: document.getElementById('workspace-new-file-btn'),
+            workspaceNewFolderBtn: document.getElementById('workspace-new-folder-btn'),
+            workspaceBatchBtn: document.getElementById('workspace-batch-btn'),
             workspaceEditor: document.getElementById('workspace-editor'),
             workspaceActive: document.getElementById('workspace-active-file'),
             workspaceLangBadge: document.getElementById('workspace-language'),
@@ -82,8 +87,10 @@
             state.workspaceSocket.close();
             state.workspaceSocket = null;
         }
-        state.workspaceFiles = new Map();
-        state.activeWorkspaceFile = null;
+        state.workspaceNodes = new Map();
+        state.workspaceTree = null;
+        state.activeWorkspaceNode = null;
+        state.expandedFolders.clear();
         if (state.workspaceSaveTimer) {
             clearTimeout(state.workspaceSaveTimer);
             state.workspaceSaveTimer = null;
@@ -414,6 +421,118 @@
         });
     }
 
+    function buildWorkspaceTree(nodes) {
+        const nodeMap = new Map();
+        const rootNodes = [];
+
+        nodes.forEach(node => {
+            nodeMap.set(node.id, { ...node, children: [] });
+        });
+
+        nodes.forEach(node => {
+            const nodeObj = nodeMap.get(node.id);
+            if (node.parent_id === null || node.parent_id === undefined) {
+                rootNodes.push(nodeObj);
+            } else {
+                const parent = nodeMap.get(node.parent_id);
+                if (parent) {
+                    parent.children.push(nodeObj);
+                } else {
+                    rootNodes.push(nodeObj);
+                }
+            }
+        });
+
+        function sortChildren(children) {
+            return children.sort((a, b) => {
+                if (a.node_type === 'folder' && b.node_type === 'file') return -1;
+                if (a.node_type === 'file' && b.node_type === 'folder') return 1;
+                return a.name.localeCompare(b.name);
+            });
+        }
+
+        function sortTree(nodes) {
+            sortChildren(nodes);
+            nodes.forEach(node => {
+                if (node.children.length > 0) {
+                    sortTree(node.children);
+                }
+            });
+        }
+
+        sortTree(rootNodes);
+        return { nodeMap, rootNodes };
+    }
+
+    function renderWorkspaceTree() {
+        const { workspaceTree } = state.workspaceUI || {};
+        if (!workspaceTree) return;
+
+        workspaceTree.innerHTML = '';
+
+        if (!state.workspaceTree || state.workspaceTree.rootNodes.length === 0) {
+            workspaceTree.innerHTML = '<div class="p-3 text-center text-muted small"><i class="bi bi-files"></i> No files yet</div>';
+            return;
+        }
+
+        function createNodeElement(node, depth = 0) {
+            const isFolder = node.node_type === 'folder';
+            const isFile = node.node_type === 'file';
+            const isExpanded = state.expandedFolders.has(node.id);
+            const isActive = state.activeWorkspaceNode === node.id;
+
+            const nodeEl = document.createElement('div');
+            nodeEl.className = `workspace-tree-node ${node.node_type}${isActive ? ' active' : ''}${isExpanded ? ' expanded' : ''}`;
+            nodeEl.dataset.nodeId = node.id;
+            nodeEl.style.paddingLeft = `${depth * 1.25}rem`;
+
+            const iconEl = document.createElement('div');
+            iconEl.className = 'workspace-tree-node-icon';
+
+            if (isFolder) {
+                iconEl.innerHTML = isExpanded ? '<i class="bi bi-folder2-open"></i>' : '<i class="bi bi-folder2"></i>';
+            } else {
+                const lang = node.language || 'text';
+                const iconMap = {
+                    python: 'bi-filetype-py',
+                    html: 'bi-filetype-html',
+                    javascript: 'bi-filetype-js',
+                    css: 'bi-filetype-css',
+                    json: 'bi-filetype-json',
+                    markdown: 'bi-filetype-md',
+                    text: 'bi-file-earmark-text'
+                };
+                iconEl.innerHTML = `<i class="bi ${iconMap[lang] || 'bi-file-earmark'}"></i>`;
+            }
+
+            const nameEl = document.createElement('span');
+            nameEl.className = 'workspace-tree-node-name';
+            nameEl.textContent = node.name;
+            nameEl.title = node.full_path || node.name;
+
+            nodeEl.appendChild(iconEl);
+            nodeEl.appendChild(nameEl);
+
+            if (isFolder && node.children.length > 0) {
+                const childrenEl = document.createElement('div');
+                childrenEl.className = 'workspace-tree-node-children';
+                node.children.forEach(child => {
+                    childrenEl.appendChild(createNodeElement(child, depth + 1));
+                });
+                nodeEl.appendChild(childrenEl);
+            }
+
+            return nodeEl;
+        }
+
+        const fragment = document.createDocumentFragment();
+        state.workspaceTree.rootNodes.forEach(node => {
+            fragment.appendChild(createNodeElement(node));
+        });
+
+        workspaceTree.appendChild(fragment);
+    }
+
     function setupWorkspaceToggle({ workspacePanel }) {
         if (!workspacePanel) return;
         const toggleBtn = workspacePanel.querySelector('#workspaceToggleBtn');
@@ -439,7 +558,10 @@
     function setupWorkspaceModule(elements) {
         const {
             workspaceKey,
-            workspaceList,
+            workspaceTree,
+            workspaceNewFileBtn,
+            workspaceNewFolderBtn,
+            workspaceBatchBtn,
             workspaceEditor,
             workspaceActive,
             workspaceLangBadge,
@@ -458,7 +580,7 @@
         }
 
         state.workspaceUI = {
-            workspaceList,
+            workspaceTree,
             workspaceEditor,
             workspaceActive,
             workspaceLangBadge,
@@ -471,6 +593,16 @@
             workspacePreview
         };
 
+        // Load expanded folders from localStorage
+        const savedExpanded = localStorage.getItem(`workspace_expanded_${workspaceKey}`);
+        if (savedExpanded) {
+            try {
+                state.expandedFolders = new Set(JSON.parse(savedExpanded));
+            } catch (e) {
+                state.expandedFolders = new Set();
+            }
+        }
+
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}/ws/workspace/${workspaceKey}/`;
         state.workspaceSocket = new WebSocket(wsUrl);
@@ -478,14 +610,86 @@
         state.workspaceSocket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'workspace_bootstrap') {
-                state.workspaceFiles = new Map();
-                data.files.forEach(file => state.workspaceFiles.set(file.id, file));
-                renderWorkspaceList();
+                state.workspaceNodes = new Map();
+                data.nodes.forEach(node => state.workspaceNodes.set(node.id, node));
+                state.workspaceTree = buildWorkspaceTree(Array.from(state.workspaceNodes.values()));
+                renderWorkspaceTree();
             } else if (data.type === 'workspace_event') {
                 handleWorkspaceEvent(data);
             }
         };
 
+        // Tree click handlers
+        workspaceTree?.addEventListener('click', (event) => {
+            const nodeEl = event.target.closest('.workspace-tree-node');
+            if (!nodeEl) return;
+
+            const nodeId = Number(nodeEl.dataset.nodeId);
+            const node = state.workspaceNodes.get(nodeId);
+            if (!node) return;
+
+            if (node.node_type === 'folder') {
+                // Toggle expand/collapse
+                if (state.expandedFolders.has(nodeId)) {
+                    state.expandedFolders.delete(nodeId);
+                } else {
+                    state.expandedFolders.add(nodeId);
+                }
+                const workspaceKey = elements.workspaceKey;
+                localStorage.setItem(`workspace_expanded_${workspaceKey}`, JSON.stringify(Array.from(state.expandedFolders)));
+                renderWorkspaceTree();
+            } else {
+                // Select file
+                setActiveWorkspaceNode(nodeId);
+            }
+        });
+
+        // New file button
+        workspaceNewFileBtn?.addEventListener('click', () => {
+            const name = prompt('Enter file name (e.g., main.py, index.html):', 'main.py');
+            if (name && state.workspaceSocket) {
+                const path = name.trim();
+                state.workspaceSocket.send(JSON.stringify({
+                    action: 'create_entry',
+                    path: path,
+                    node_type: 'file'
+                }));
+            }
+        });
+
+        // New folder button
+        workspaceNewFolderBtn?.addEventListener('click', () => {
+            const name = prompt('Enter folder name:', 'new-folder');
+            if (name && state.workspaceSocket) {
+                const path = name.trim();
+                state.workspaceSocket.send(JSON.stringify({
+                    action: 'create_entry',
+                    path: path,
+                    node_type: 'folder'
+                }));
+            }
+        });
+
+        // Batch create button
+        workspaceBatchBtn?.addEventListener('click', () => {
+            const input = prompt('Enter file paths (one per line):\nExample:\nbackend/app.py\nfrontend/index.html\nutils/helper.js');
+            if (!input || !state.workspaceSocket) return;
+
+            const paths = input.split('\n').map(p => p.trim()).filter(p => p);
+            if (paths.length === 0) return;
+
+            const entries = paths.map(path => ({
+                path: path,
+                node_type: path.endsWith('/') ? 'folder' : 'file'
+            }));
+
+            state.workspaceSocket.send(JSON.stringify({
+                action: 'create_batch',
+                entries: entries
+            }));
+        });
+
+        // Legacy create buttons (for backward compatibility)
         workspaceCreateButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const language = btn.dataset.workspaceCreate;
@@ -493,74 +697,79 @@
                 const name = prompt(`Name your ${language.toUpperCase()} file:`, defaultName);
                 if (name && state.workspaceSocket) {
                     state.workspaceSocket.send(JSON.stringify({
-                        action: 'create_file',
-                        language,
-                        name: name.trim()
+                        action: 'create_entry',
+                        path: name.trim(),
+                        node_type: 'file',
+                        language: language
                     }));
                 }
             });
         });
 
-        workspaceList?.addEventListener('click', (event) => {
-            const item = event.target.closest('.workspace-file-item');
-            if (!item) return;
-            setActiveWorkspaceFile(Number(item.dataset.fileId));
-        });
-
         workspaceRenameBtn?.addEventListener('click', () => {
-            if (!state.activeWorkspaceFile || !state.workspaceSocket) return;
-            const currentName = state.workspaceFiles.get(state.activeWorkspaceFile)?.name;
-            const newName = prompt('Rename file', currentName);
-            if (newName && newName.trim() !== currentName) {
+            if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
+            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+            if (!node) return;
+            const newName = prompt('Rename', node.name);
+            if (newName && newName.trim() !== node.name) {
                 state.workspaceSocket.send(JSON.stringify({
-                    action: 'rename_file',
-                    file_id: state.activeWorkspaceFile,
+                    action: 'rename_node',
+                    node_id: state.activeWorkspaceNode,
                     name: newName.trim()
                 }));
             }
         });
 
         workspaceDeleteBtn?.addEventListener('click', () => {
-            if (!state.activeWorkspaceFile || !state.workspaceSocket) return;
-            if (confirm('Delete this file for everyone?')) {
+            if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
+            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+            if (!node) return;
+            const confirmMsg = node.node_type === 'folder' 
+                ? 'Delete this folder and all its contents for everyone?'
+                : 'Delete this file for everyone?';
+            if (confirm(confirmMsg)) {
                 state.workspaceSocket.send(JSON.stringify({
-                    action: 'delete_file',
-                    file_id: state.activeWorkspaceFile
+                    action: 'delete_node',
+                    node_id: state.activeWorkspaceNode
                 }));
             }
         });
 
         workspaceEditor?.addEventListener('input', () => {
-            if (!state.activeWorkspaceFile || !state.workspaceSocket) return;
+            if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
+            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+            if (!node || node.node_type !== 'file') return;
             if (state.workspaceSaveTimer) {
                 clearTimeout(state.workspaceSaveTimer);
             }
             state.workspaceSaveTimer = setTimeout(() => {
                 state.workspaceSocket?.send(JSON.stringify({
                     action: 'update_content',
-                    file_id: state.activeWorkspaceFile,
+                    node_id: state.activeWorkspaceNode,
                     content: workspaceEditor.value
                 }));
             }, 600);
         });
 
         workspaceRunBtn?.addEventListener('click', () => {
-            if (!state.activeWorkspaceFile || !state.workspaceSocket) return;
+            if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
+            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+            if (!node || node.node_type !== 'file') return;
             state.workspaceSocket.send(JSON.stringify({
                 action: 'run_file',
-                file_id: state.activeWorkspaceFile
+                node_id: state.activeWorkspaceNode
             }));
         });
 
         workspaceDownloadBtn?.addEventListener('click', () => {
-            if (!state.activeWorkspaceFile) return;
-            const file = state.workspaceFiles.get(state.activeWorkspaceFile);
-            if (!file) return;
-            const blob = new Blob([file.content], { type: 'text/plain' });
+            if (!state.activeWorkspaceNode) return;
+            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+            if (!node || node.node_type !== 'file') return;
+            const blob = new Blob([node.content || ''], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = file.name;
+            a.download = node.name;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -570,29 +779,19 @@
 
     function handleWorkspaceEvent(payload) {
         const { workspaceEditor, workspaceActive, workspaceLangBadge } = state.workspaceUI || {};
-        const file = payload.file;
 
         switch (payload.event) {
-            case 'file_created':
-            case 'file_updated':
-            case 'file_renamed':
-                state.workspaceFiles.set(file.id, file);
-                if (state.activeWorkspaceFile === file.id && workspaceEditor) {
-                    workspaceEditor.value = file.content;
-                    if (workspaceActive) workspaceActive.textContent = file.name;
-                    if (workspaceLangBadge) {
-                        workspaceLangBadge.textContent = file.language.toUpperCase();
-                        workspaceLangBadge.classList.remove('d-none');
-                    }
+            case 'tree_refresh':
+                // Rebuild tree from nodes
+                state.workspaceNodes = new Map();
+                payload.nodes.forEach(node => state.workspaceNodes.set(node.id, node));
+                state.workspaceTree = buildWorkspaceTree(Array.from(state.workspaceNodes.values()));
+                renderWorkspaceTree();
+                
+                // If there's an active_id, select it
+                if (payload.active_id) {
+                    setActiveWorkspaceNode(payload.active_id);
                 }
-                renderWorkspaceList();
-                break;
-            case 'file_deleted':
-                state.workspaceFiles.delete(payload.file_id);
-                if (state.activeWorkspaceFile === payload.file_id) {
-                    resetWorkspaceEditor();
-                }
-                renderWorkspaceList();
                 break;
             case 'run_result':
                 updateRunOutput(payload);
@@ -600,38 +799,11 @@
         }
     }
 
-    function renderWorkspaceList() {
-        const { workspaceList } = state.workspaceUI || {};
-        if (!workspaceList) return;
+    function setActiveWorkspaceNode(nodeId) {
+        const node = state.workspaceNodes.get(nodeId);
+        if (!node || !state.workspaceUI) return;
+        if (node.node_type !== 'file') return;
 
-        workspaceList.innerHTML = '';
-        if (state.workspaceFiles.size === 0) {
-            workspaceList.innerHTML = '<div class="p-3 text-center text-muted small"><i class="bi bi-files"></i> No files yet</div>';
-            return;
-        }
-
-        const fragment = document.createDocumentFragment();
-        Array.from(state.workspaceFiles.values())
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .forEach(file => {
-                const item = document.createElement('div');
-                item.className = 'workspace-file-item';
-                if (state.activeWorkspaceFile === file.id) {
-                    item.classList.add('active');
-                }
-                item.dataset.fileId = file.id;
-                item.innerHTML = `
-                    <span><i class="bi bi-file-earmark-code me-2"></i>${file.name}</span>
-                    <small class="text-uppercase text-muted">${file.language}</small>
-                `;
-                fragment.appendChild(item);
-            });
-        workspaceList.appendChild(fragment);
-    }
-
-    function setActiveWorkspaceFile(fileId) {
-        const file = state.workspaceFiles.get(fileId);
-        if (!file || !state.workspaceUI) return;
         const {
             workspaceEditor,
             workspaceActive,
@@ -642,22 +814,22 @@
             workspaceDeleteBtn
         } = state.workspaceUI;
 
-        state.activeWorkspaceFile = fileId;
+        state.activeWorkspaceNode = nodeId;
 
         if (workspaceEditor) {
             workspaceEditor.disabled = false;
-            workspaceEditor.value = file.content;
+            workspaceEditor.value = node.content || '';
         }
-        if (workspaceActive) workspaceActive.textContent = file.name;
+        if (workspaceActive) workspaceActive.textContent = node.full_path || node.name;
         if (workspaceLangBadge) {
-            workspaceLangBadge.textContent = file.language.toUpperCase();
+            workspaceLangBadge.textContent = (node.language || 'text').toUpperCase();
             workspaceLangBadge.classList.remove('d-none');
         }
         [workspaceRunBtn, workspaceDownloadBtn, workspaceRenameBtn, workspaceDeleteBtn].forEach(btn => {
             if (btn) btn.disabled = false;
         });
 
-        renderWorkspaceList();
+        renderWorkspaceTree();
     }
 
     function resetWorkspaceEditor() {
@@ -674,7 +846,7 @@
             workspacePreview
         } = state.workspaceUI || {};
 
-        state.activeWorkspaceFile = null;
+        state.activeWorkspaceNode = null;
         if (workspaceEditor) {
             workspaceEditor.disabled = true;
             workspaceEditor.value = '';

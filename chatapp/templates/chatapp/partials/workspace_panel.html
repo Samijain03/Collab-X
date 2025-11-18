@@ -16,9 +16,25 @@
     </div>
     <div class="workspace-body">
         {% if workspace_key %}
-        <div class="workspace-file-list" id="workspace-file-list">
-            <div class="p-3 text-center text-muted small">
-                <i class="bi bi-files"></i> No files yet
+        <div class="workspace-tree-container">
+            <div class="workspace-tree-header">
+                <span class="workspace-tree-title">Explorer</span>
+                <div class="workspace-tree-actions">
+                    <button class="btn btn-sm btn-outline-light" id="workspace-new-file-btn" title="New File">
+                        <i class="bi bi-file-earmark-plus"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-light" id="workspace-new-folder-btn" title="New Folder">
+                        <i class="bi bi-folder-plus"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-light" id="workspace-batch-btn" title="Batch Create">
+                        <i class="bi bi-stack"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="workspace-file-tree" id="workspace-file-tree">
+                <div class="p-3 text-center text-muted small">
+                    <i class="bi bi-files"></i> No files yet
+                </div>
             </div>
         </div>
         <div class="workspace-editor" id="workspace-editor-wrapper">

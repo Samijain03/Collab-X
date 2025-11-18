@@ -13,8 +13,17 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from asgiref.sync import sync_to_async
 
-from .models import Message, Profile, Group, GroupMessage, WorkspaceFile
+from .models import Message, Profile, Group, GroupMessage, WorkspaceNode
 from .gemini_utils import format_chat_history, get_collab_response
+from .workspace_utils import (
+    ensure_path,
+    serialize_node,
+    parse_collab_command,
+    extract_code_blocks,
+    delete_subtree,
+    normalize_path,
+    guess_language,
+)
 
 def parse_bot_response(response_text):
     """
@@ -145,12 +154,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'message_id': event['message_id'],
         }))
 
-    # --- NEW `handle_collab_command` ---
+    # --- UPDATED `handle_collab_command` with workspace integration ---
     async def handle_collab_command(self, command_text, is_hidden):
-        # Generate a unique ID for this request
         request_id = f"bot-{self.user.id}-{int(time.time())}"
         
-        # 1. Send "Thinking..." message
+        # Parse command to check if it's a file/folder operation
+        target_type, target_path, instructions, language = await database_sync_to_async(parse_collab_command)(command_text)
+        
+        # Get workspace key for this chat
+        user_ids = sorted([self.user.id, self.contact_user.id])
+        workspace_key = f"chat_{user_ids[0]}_{user_ids[1]}"
+        
+        # Send "Thinking..." message
         thinking_payload_js = {
             'type': 'bot_message',
             'status': 'thinking',
@@ -161,12 +176,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }
         
         if is_hidden:
-            # Send "Thinking..." only to the user
             await self.send(text_data=json.dumps(thinking_payload_js))
         else:
-            # Broadcast "Thinking..." to the group
             await self.channel_layer.group_send(self.room_group_name, {
-                'type': 'bot_message', # This is the handler name
+                'type': 'bot_message',
                 'status': 'thinking',
                 'message': "Thinking...",
                 'sender_username': 'Collab-X',
@@ -174,47 +187,136 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'request_id': request_id
             })
         
-        # 2. Extract user's actual query
-        if is_hidden:
-            user_query = command_text.replace('/Collab hidden', '').strip()
+        # Prepare query for Gemini
+        if target_type:
+            # File/folder operation - enhance prompt
+            user_query = f"Create/update {target_type} at {target_path}. Instructions: {instructions}" if instructions else f"Create/update {target_type} at {target_path}"
+            if target_type == 'file' and language:
+                user_query += f" Language: {language}"
+            user_query += "\n\nPlease provide the code in a code block. If creating multiple files, use separate code blocks with filename annotations like: ```python:filename.py"
         else:
-            user_query = command_text.replace('/Collab', '').strip()
-        if not user_query:
-            user_query = "Summarize our chat so far."
-            
-        # 3. Get chat history
-        chat_history_string = await self.get_chat_history()
+            # Regular query
+            if is_hidden:
+                user_query = command_text.replace('/Collab hidden', '').strip()
+            else:
+                user_query = command_text.replace('/Collab', '').strip()
+            if not user_query:
+                user_query = "Summarize our chat so far."
         
-        # 4. Call Gemini (wrapped)
+        # Get chat history and workspace context
+        chat_history_string = await self.get_chat_history()
+        workspace_files = await self.get_workspace_files(workspace_key)
+        
+        # Build enhanced prompt with workspace context
+        workspace_context = ""
+        if workspace_files:
+            workspace_context = "\n\nCurrent workspace files:\n" + "\n".join([f"- {f['full_path']} ({f.get('language', 'text')})" for f in workspace_files[:10]])
+        
+        # Call Gemini with enhanced context
+        enhanced_query = user_query + workspace_context
         bot_response_text = await database_sync_to_async(get_collab_response)(
             chat_history_string, 
-            user_query
+            enhanced_query
         )
         clean_content, jump_id = parse_bot_response(bot_response_text)
         
-        # 5. Send the final response
+        # If it's a file/folder operation, extract code and create/update files
+        created_files = []
+        if target_type and target_path:
+            code_blocks = await database_sync_to_async(extract_code_blocks)(bot_response_text)
+            
+            if target_type == 'file':
+                # Single file operation
+                if code_blocks:
+                    block = code_blocks[0]
+                    file_path = target_path
+                    file_lang = language or block.get('language') or await database_sync_to_async(guess_language)(file_path)
+                    file_content = block.get('content', clean_content)
+                    
+                    node = await database_sync_to_async(ensure_path)(
+                        workspace_key,
+                        file_path,
+                        user=self.user,
+                        node_type=WorkspaceNode.NodeType.FILE,
+                        language=file_lang,
+                        content=file_content
+                    )
+                    created_files.append(node.id)
+                    
+                    # Broadcast workspace update
+                    await self.broadcast_workspace_update(workspace_key, node.id)
+            elif target_type == 'folder':
+                # Multiple files in folder
+                for block in code_blocks:
+                    filename = block.get('filename')
+                    if not filename:
+                        continue
+                    file_path = f"{target_path.rstrip('/')}/{filename}"
+                    file_lang = block.get('language') or await database_sync_to_async(guess_language)(filename)
+                    file_content = block.get('content', '')
+                    
+                    node = await database_sync_to_async(ensure_path)(
+                        workspace_key,
+                        file_path,
+                        user=self.user,
+                        node_type=WorkspaceNode.NodeType.FILE,
+                        language=file_lang,
+                        content=file_content
+                    )
+                    created_files.append(node.id)
+                
+                if created_files:
+                    await self.broadcast_workspace_update(workspace_key, created_files[-1])
+        
+        # Send final response with file creation info
+        response_content = clean_content
+        if created_files:
+            response_content += f"\n\n✅ Created/updated {len(created_files)} file(s) in workspace."
+        
         final_payload_js = {
             'type': 'bot_message',
             'status': 'complete',
-            'content': clean_content,
+            'content': response_content,
             'sender_username': 'Collab-X',
             'jump_id': jump_id,
-            'request_id': request_id # Use same ID
+            'request_id': request_id
         }
 
         if is_hidden:
-            # Send final response only to the user
             await self.send(text_data=json.dumps(final_payload_js))
         else:
-            # Broadcast final response to the group
             await self.channel_layer.group_send(self.room_group_name, {
-                'type': 'bot_message', # Handler name
+                'type': 'bot_message',
                 'status': 'complete',
-                'message': clean_content,
+                'message': response_content,
                 'sender_username': 'Collab-X',
                 'jump_id': jump_id,
                 'request_id': request_id
             })
+    
+    async def broadcast_workspace_update(self, workspace_key, active_id):
+        """Broadcast workspace tree refresh"""
+        from channels.layers import get_channel_layer
+        channel_layer = get_channel_layer()
+        nodes = await self.get_workspace_nodes(workspace_key)
+        await channel_layer.group_send(workspace_key, {
+            'type': 'workspace_event',
+            'event': 'tree_refresh',
+            'nodes': nodes,
+            'active_id': active_id,
+        })
+    
+    @database_sync_to_async
+    def get_workspace_files(self, workspace_key):
+        """Get list of workspace files for context"""
+        nodes = WorkspaceNode.objects.filter(workspace_key=workspace_key, node_type=WorkspaceNode.NodeType.FILE)
+        return [serialize_node(node) for node in nodes[:20]]
+    
+    @database_sync_to_async
+    def get_workspace_nodes(self, workspace_key):
+        """Get all workspace nodes"""
+        nodes = WorkspaceNode.objects.filter(workspace_key=workspace_key).select_related('parent').order_by('parent_id', 'position', 'name')
+        return [serialize_node(node) for node in nodes]
 
     # --- UPDATED `bot_message` HANDLER ---
     async def bot_message(self, event):
@@ -378,6 +480,13 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
     async def handle_collab_command(self, command_text, is_hidden):
         request_id = f"bot-{self.user.id}-{int(time.time())}"
         
+        # Parse command to check if it's a file/folder operation
+        target_type, target_path, instructions, language = await database_sync_to_async(parse_collab_command)(command_text)
+        
+        # Get workspace key for this group
+        workspace_key = f"group_{self.group_id}"
+        
+        # Send "Thinking..." message
         thinking_payload_js = {
             'type': 'bot_message',
             'status': 'thinking',
@@ -399,25 +508,87 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
                 'request_id': request_id
             })
         
-        if is_hidden:
-            user_query = command_text.replace('/Collab hidden', '').strip()
+        # Prepare query for Gemini
+        if target_type:
+            user_query = f"Create/update {target_type} at {target_path}. Instructions: {instructions}" if instructions else f"Create/update {target_type} at {target_path}"
+            if target_type == 'file' and language:
+                user_query += f" Language: {language}"
+            user_query += "\n\nPlease provide the code in a code block. If creating multiple files, use separate code blocks with filename annotations like: ```python:filename.py"
         else:
-            user_query = command_text.replace('/Collab', '').strip()
-        if not user_query:
-            user_query = "Summarize this group chat so far."
-            
-        chat_history_string = await self.get_chat_history()
+            if is_hidden:
+                user_query = command_text.replace('/Collab hidden', '').strip()
+            else:
+                user_query = command_text.replace('/Collab', '').strip()
+            if not user_query:
+                user_query = "Summarize this group chat so far."
         
+        # Get chat history and workspace context
+        chat_history_string = await self.get_chat_history()
+        workspace_files = await self.get_workspace_files(workspace_key)
+        
+        workspace_context = ""
+        if workspace_files:
+            workspace_context = "\n\nCurrent workspace files:\n" + "\n".join([f"- {f['full_path']} ({f.get('language', 'text')})" for f in workspace_files[:10]])
+        
+        enhanced_query = user_query + workspace_context
         bot_response_text = await database_sync_to_async(get_collab_response)(
             chat_history_string, 
-            user_query
+            enhanced_query
         )
         clean_content, jump_id = parse_bot_response(bot_response_text)
+        
+        # If it's a file/folder operation, extract code and create/update files
+        created_files = []
+        if target_type and target_path:
+            code_blocks = await database_sync_to_async(extract_code_blocks)(bot_response_text)
+            
+            if target_type == 'file':
+                if code_blocks:
+                    block = code_blocks[0]
+                    file_path = target_path
+                    file_lang = language or block.get('language') or await database_sync_to_async(guess_language)(file_path)
+                    file_content = block.get('content', clean_content)
+                    
+                    node = await database_sync_to_async(ensure_path)(
+                        workspace_key,
+                        file_path,
+                        user=self.user,
+                        node_type=WorkspaceNode.NodeType.FILE,
+                        language=file_lang,
+                        content=file_content
+                    )
+                    created_files.append(node.id)
+                    await self.broadcast_workspace_update(workspace_key, node.id)
+            elif target_type == 'folder':
+                for block in code_blocks:
+                    filename = block.get('filename')
+                    if not filename:
+                        continue
+                    file_path = f"{target_path.rstrip('/')}/{filename}"
+                    file_lang = block.get('language') or await database_sync_to_async(guess_language)(filename)
+                    file_content = block.get('content', '')
+                    
+                    node = await database_sync_to_async(ensure_path)(
+                        workspace_key,
+                        file_path,
+                        user=self.user,
+                        node_type=WorkspaceNode.NodeType.FILE,
+                        language=file_lang,
+                        content=file_content
+                    )
+                    created_files.append(node.id)
+                
+                if created_files:
+                    await self.broadcast_workspace_update(workspace_key, created_files[-1])
+        
+        response_content = clean_content
+        if created_files:
+            response_content += f"\n\n✅ Created/updated {len(created_files)} file(s) in workspace."
         
         final_payload_js = {
             'type': 'bot_message',
             'status': 'complete',
-            'content': clean_content,
+            'content': response_content,
             'sender_username': 'Collab-X',
             'jump_id': jump_id,
             'request_id': request_id
@@ -429,11 +600,35 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_send(self.room_group_name, {
                 'type': 'bot_message',
                 'status': 'complete',
-                'message': clean_content,
+                'message': response_content,
                 'sender_username': 'Collab-X',
                 'jump_id': jump_id,
                 'request_id': request_id
             })
+    
+    async def broadcast_workspace_update(self, workspace_key, active_id):
+        """Broadcast workspace tree refresh"""
+        from channels.layers import get_channel_layer
+        channel_layer = get_channel_layer()
+        nodes = await self.get_workspace_nodes(workspace_key)
+        await channel_layer.group_send(workspace_key, {
+            'type': 'workspace_event',
+            'event': 'tree_refresh',
+            'nodes': nodes,
+            'active_id': active_id,
+        })
+    
+    @database_sync_to_async
+    def get_workspace_files(self, workspace_key):
+        """Get list of workspace files for context"""
+        nodes = WorkspaceNode.objects.filter(workspace_key=workspace_key, node_type=WorkspaceNode.NodeType.FILE)
+        return [serialize_node(node) for node in nodes[:20]]
+    
+    @database_sync_to_async
+    def get_workspace_nodes(self, workspace_key):
+        """Get all workspace nodes"""
+        nodes = WorkspaceNode.objects.filter(workspace_key=workspace_key).select_related('parent').order_by('parent_id', 'position', 'name')
+        return [serialize_node(node) for node in nodes]
 
     # --- UPDATED `bot_message` HANDLER ---
     async def bot_message(self, event):
@@ -497,10 +692,10 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.workspace_key, self.channel_name)
         await self.accept()
 
-        files = await self.get_workspace_files()
+        nodes = await self.get_workspace_nodes()
         await self.send(text_data=json.dumps({
             'type': 'workspace_bootstrap',
-            'files': files
+            'nodes': nodes
         }))
 
     async def disconnect(self, close_code):
@@ -511,89 +706,111 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         action = data.get('action')
 
-        if action == 'create_file':
-            await self.handle_create_file(data)
-        elif action == 'delete_file':
-            await self.handle_delete_file(data)
-        elif action == 'rename_file':
-            await self.handle_rename_file(data)
+        if action == 'create_entry':
+            await self.handle_create_entry(data)
+        elif action == 'create_batch':
+            await self.handle_create_batch(data)
+        elif action == 'rename_node':
+            await self.handle_rename_node(data)
+        elif action == 'move_node':
+            await self.handle_move_node(data)
+        elif action == 'delete_node':
+            await self.handle_delete_node(data)
         elif action == 'update_content':
             await self.handle_update_content(data)
         elif action == 'run_file':
             await self.handle_run_file(data)
 
-    async def handle_create_file(self, data):
-        name = (data.get('name') or '').strip()
+    async def handle_create_entry(self, data):
+        path = (data.get('path') or '').strip()
+        node_type = data.get('node_type', WorkspaceNode.NodeType.FILE)
         language = data.get('language')
+        content = data.get('content')
 
-        if not name or language not in dict(WorkspaceFile.LANGUAGE_CHOICES):
+        if not path:
             return
 
-        file_obj = await self.create_workspace_file(name, language)
-        if file_obj:
-            payload = {
-                'type': 'workspace_event',
-                'event': 'file_created',
-                'file': file_obj
-            }
-            await self.channel_layer.group_send(self.workspace_key, payload)
+        node = await database_sync_to_async(ensure_path)(
+            self.workspace_key,
+            path,
+            user=self.user,
+            node_type=node_type,
+            language=language,
+            content=content
+        )
+        await self.broadcast_tree(active_id=node.id if node.is_file else None)
 
-    async def handle_delete_file(self, data):
-        file_id = data.get('file_id')
-        deleted_id = await self.delete_workspace_file(file_id)
-        if deleted_id:
-            payload = {
-                'type': 'workspace_event',
-                'event': 'file_deleted',
-                'file_id': deleted_id
-            }
-            await self.channel_layer.group_send(self.workspace_key, payload)
+    async def handle_create_batch(self, data):
+        entries = data.get('entries') or []
+        created_ids = []
+        for entry in entries:
+            path = entry.get('path')
+            if not path:
+                continue
+            node = await database_sync_to_async(ensure_path)(
+                self.workspace_key,
+                path,
+                user=self.user,
+                node_type=entry.get('node_type', WorkspaceNode.NodeType.FILE),
+                language=entry.get('language'),
+                content=entry.get('content')
+            )
+            created_ids.append(node.id)
+        if created_ids:
+            await self.broadcast_tree(active_id=created_ids[-1])
 
-    async def handle_rename_file(self, data):
-        file_id = data.get('file_id')
+    async def handle_rename_node(self, data):
+        node_id = data.get('node_id')
         new_name = (data.get('name') or '').strip()
-        renamed = await self.rename_workspace_file(file_id, new_name)
-        if renamed:
-            payload = {
-                'type': 'workspace_event',
-                'event': 'file_renamed',
-                'file': renamed
-            }
-            await self.channel_layer.group_send(self.workspace_key, payload)
+        if not node_id or not new_name:
+            return
+        await database_sync_to_async(self._rename_node)(node_id, new_name)
+        await self.broadcast_tree(active_id=node_id)
+
+    async def handle_move_node(self, data):
+        node_id = data.get('node_id')
+        parent_id = data.get('parent_id')
+        position = data.get('position', 0)
+        if not node_id:
+            return
+        await database_sync_to_async(self._move_node)(node_id, parent_id, position)
+        await self.broadcast_tree(active_id=node_id)
+
+    async def handle_delete_node(self, data):
+        node_id = data.get('node_id')
+        if not node_id:
+            return
+        await database_sync_to_async(self._delete_node)(node_id)
+        await self.broadcast_tree()
 
     async def handle_update_content(self, data):
-        file_id = data.get('file_id')
+        node_id = data.get('node_id')
         content = data.get('content', '')
-        updated = await self.update_workspace_file(file_id, content)
-        if updated:
-            payload = {
-                'type': 'workspace_event',
-                'event': 'file_updated',
-                'file': updated,
-                'updated_by': self.user.username
-            }
-            await self.channel_layer.group_send(self.workspace_key, payload)
+        if not node_id:
+            return
+        await database_sync_to_async(self._update_file_content)(node_id, content)
+        await self.broadcast_tree(active_id=node_id)
 
     async def handle_run_file(self, data):
-        file_id = data.get('file_id')
-        file_data = await self.get_workspace_file(file_id)
-        if not file_data:
+        node_id = data.get('node_id')
+        node = await self.get_workspace_node(node_id)
+        if not node or node['node_type'] != WorkspaceNode.NodeType.FILE:
             return
 
-        if file_data['language'] == 'python':
-            result = await sync_to_async(self._run_python)(file_data['content'])
+        if node['language'] == 'python':
+            result = await sync_to_async(self._run_python)(node['content'])
         else:
             result = {
                 'stdout': '',
                 'stderr': '',
-                'html': file_data['content']
+                'html': node['content']
             }
 
         response = {
             'type': 'workspace_event',
             'event': 'run_result',
-            'file_id': file_id,
-            'language': file_data['language'],
+            'node_id': node_id,
+            'language': node['language'],
             'requested_by': self.user.username,
             'result': result
         }
@@ -601,7 +818,20 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_send(self.workspace_key, response)
 
     async def workspace_event(self, event):
-        await self.send(text_data=json.dumps(event))
+        if event.get('event') == 'tree_refresh':
+            await self.send(text_data=json.dumps(event))
+        else:
+            await self.send(text_data=json.dumps(event))
+
+    async def broadcast_tree(self, active_id: int | None = None):
+        nodes = await self.get_workspace_nodes()
+        payload = {
+            'type': 'workspace_event',
+            'event': 'tree_refresh',
+            'nodes': nodes,
+            'active_id': active_id,
+        }
+        await self.channel_layer.group_send(self.workspace_key, payload)
 
     @database_sync_to_async
     def check_workspace_access(self):
@@ -625,106 +855,44 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
         return False
 
     @database_sync_to_async
-    def get_workspace_files(self):
-        return [
-            {
-                'id': file.id,
-                'name': file.name,
-                'language': file.language,
-                'content': file.content,
-                'updated_at': file.updated_at.isoformat(),
-            }
-            for file in WorkspaceFile.objects.filter(workspace_key=self.workspace_key)
-        ]
+    def get_workspace_nodes(self):
+        nodes = WorkspaceNode.objects.filter(workspace_key=self.workspace_key).select_related('parent').order_by('parent_id', 'position', 'name')
+        return [serialize_node(node) for node in nodes]
 
     @database_sync_to_async
-    def create_workspace_file(self, name, language):
-        default_content = self._default_content(language, name)
-        file_obj, created = WorkspaceFile.objects.get_or_create(
-            workspace_key=self.workspace_key,
-            name=name,
-            defaults={
-                'language': language,
-                'content': default_content,
-                'created_by': self.user,
-            }
-        )
-        if not created:
-            return None
-        return {
-            'id': file_obj.id,
-            'name': file_obj.name,
-            'language': file_obj.language,
-            'content': file_obj.content,
-            'updated_at': file_obj.updated_at.isoformat(),
-        }
+    def _rename_node(self, node_id, new_name):
+        node = WorkspaceNode.objects.get(id=node_id, workspace_key=self.workspace_key)
+        node.name = new_name
+        node.save(update_fields=['name', 'updated_at'])
 
     @database_sync_to_async
-    def delete_workspace_file(self, file_id):
+    def _move_node(self, node_id, parent_id, position):
+        node = WorkspaceNode.objects.get(id=node_id, workspace_key=self.workspace_key)
+        parent = None
+        if parent_id:
+            parent = WorkspaceNode.objects.get(id=parent_id, workspace_key=self.workspace_key)
+        node.parent = parent
+        node.position = position or 0
+        node.save(update_fields=['parent', 'position', 'updated_at'])
+
+    @database_sync_to_async
+    def _delete_node(self, node_id):
+        node = WorkspaceNode.objects.get(id=node_id, workspace_key=self.workspace_key)
+        delete_subtree(node)
+
+    @database_sync_to_async
+    def _update_file_content(self, node_id, content):
+        node = WorkspaceNode.objects.get(id=node_id, workspace_key=self.workspace_key, node_type=WorkspaceNode.NodeType.FILE)
+        node.content = content
+        node.save(update_fields=['content', 'updated_at'])
+
+    @database_sync_to_async
+    def get_workspace_node(self, node_id):
         try:
-            file_obj = WorkspaceFile.objects.get(id=file_id, workspace_key=self.workspace_key)
-            file_obj.delete()
-            return file_id
-        except WorkspaceFile.DoesNotExist:
+            node = WorkspaceNode.objects.get(id=node_id, workspace_key=self.workspace_key)
+            return serialize_node(node)
+        except WorkspaceNode.DoesNotExist:
             return None
-
-    @database_sync_to_async
-    def rename_workspace_file(self, file_id, new_name):
-        if not new_name:
-            return None
-        try:
-            file_obj = WorkspaceFile.objects.get(id=file_id, workspace_key=self.workspace_key)
-            file_obj.name = new_name
-            file_obj.save(update_fields=['name', 'updated_at'])
-            return {
-                'id': file_obj.id,
-                'name': file_obj.name,
-                'language': file_obj.language,
-                'content': file_obj.content,
-                'updated_at': file_obj.updated_at.isoformat(),
-            }
-        except WorkspaceFile.DoesNotExist:
-            return None
-
-    @database_sync_to_async
-    def update_workspace_file(self, file_id, content):
-        try:
-            file_obj = WorkspaceFile.objects.get(id=file_id, workspace_key=self.workspace_key)
-            file_obj.content = content
-            file_obj.save(update_fields=['content', 'updated_at'])
-            return {
-                'id': file_obj.id,
-                'name': file_obj.name,
-                'language': file_obj.language,
-                'content': file_obj.content,
-                'updated_at': file_obj.updated_at.isoformat(),
-            }
-        except WorkspaceFile.DoesNotExist:
-            return None
-
-    @database_sync_to_async
-    def get_workspace_file(self, file_id):
-        try:
-            file_obj = WorkspaceFile.objects.get(id=file_id, workspace_key=self.workspace_key)
-            return {
-                'id': file_obj.id,
-                'name': file_obj.name,
-                'language': file_obj.language,
-                'content': file_obj.content,
-            }
-        except WorkspaceFile.DoesNotExist:
-            return None
-
-    def _default_content(self, language, name):
-        if language == 'python':
-            return f"""def main():
-    print("Hello from {name}!")
-
-
-if __name__ == "__main__":
-    main()
-"""
-        return "<!-- Collaborative HTML file -->\n<!DOCTYPE html>\n<html>\n  <head>\n    <title>Collab-X</title>\n  </head>\n  <body>\n    <h1>Hello from {name}</h1>\n  </body>\n</html>\n"
 
     def _run_python(self, content):
         with tempfile.NamedTemporaryFile('w', suffix='.py', delete=False) as tmp:

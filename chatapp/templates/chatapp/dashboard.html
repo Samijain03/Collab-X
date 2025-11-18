@@ -493,993 +493,791 @@
 </style>
 {% endblock %}
 
-                    {% block content %}
-                    <div class="chat-container" data-chat-type="{{ chat_type|default:'' }}"
-                        data-chat-id="{{ chat_id|default:'' }}" data-workspace-key="{{ workspace_key|default:'' }}"
-                        data-current-username="{{ user.username }}"
-                        data-bot-avatar="{% static 'chatapp/images/bot_avatar.png' %}">
-                        <div class="sidebar" id="sidebar">
-                            <div class="sidebar-header">
-                                <h5><i class="bi bi-terminal me-2"></i>Messages</h5>
-                                <div>
-                                    <button class="btn btn-sm" id="toggle-workspace-panel" title="Toggle Workspace">
-                                        <i class="bi bi-folder2-open fs-5"></i>
-                                    </button>
-                                    <button class="btn btn-sm" id="toggle-code-panel" title="Toggle Code Playground">
-                                        <i class="bi bi-code-slash fs-5"></i>
-                                    </button>
-                                    <a href="{% url 'chatapp:search_users' %}" class="btn btn-sm" title="Add Contact">
-                                        <i class="bi bi-person-plus-fill fs-5"></i>
-                                    </a>
-                                </div>
-                            </div>
+{% block content %}
+<div class="chat-container" data-chat-type="{{ chat_type|default:'' }}" data-chat-id="{{ chat_id|default:'' }}"
+    data-workspace-key="{{ workspace_key|default:'' }}" data-current-username="{{ user.username }}"
+    data-bot-avatar="{% static 'chatapp/images/bot_avatar.png' %}">
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h5><i class="bi bi-terminal me-2"></i>Messages</h5>
+            <div>
+                <button class="btn btn-sm" id="toggle-workspace-panel" title="Toggle Workspace">
+                    <i class="bi bi-folder2-open fs-5"></i>
+                </button>
+                <button class="btn btn-sm" id="toggle-code-panel" title="Toggle Code Playground">
+                    <i class="bi bi-code-slash fs-5"></i>
+                </button>
+                <a href="{% url 'chatapp:search_users' %}" class="btn btn-sm" title="Add Contact">
+                    <i class="bi bi-person-plus-fill fs-5"></i>
+                </a>
+            </div>
+        </div>
 
-                            <div class="search-wrapper">
-                                <i class="bi bi-search"></i>
-                                <input type="text" class="form-control search-input" id="contact-search-input"
-                                    placeholder="Search conversations...">
-                            </div>
+        <div class="search-wrapper">
+            <i class="bi bi-search"></i>
+            <input type="text" class="form-control search-input" id="contact-search-input"
+                placeholder="Search conversations...">
+        </div>
 
-                            {% if incoming_requests %}
-                            <div class="contact-requests">
-                                <h6><i class="bi bi-person-plus-fill me-2"></i>Contact Requests</h6>
-                                {% for request in incoming_requests %}
-                                <div class="request-item">
-                                    <span class="fw-semibold">{{ request.from_user.username }}</span>
-                                    <div>
-                                        <a href="{% url 'chatapp:accept_contact_request' request.id %}"
-                                            class="btn btn-success btn-sm me-1" title="Accept">
-                                            <i class="bi bi-check-lg"></i>
-                                        </a>
-                                        <a href="{% url 'chatapp:decline_contact_request' request.id %}"
-                                            class="btn btn-danger btn-sm" title="Decline">
-                                            <i class="bi bi-x-lg"></i>
-                                        </a>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
+        {% if incoming_requests %}
+        <div class="contact-requests">
+            <h6><i class="bi bi-person-plus-fill me-2"></i>Contact Requests</h6>
+            {% for request in incoming_requests %}
+            <div class="request-item">
+                <span class="fw-semibold">{{ request.from_user.username }}</span>
+                <div>
+                    <a href="{% url 'chatapp:accept_contact_request' request.id %}" class="btn btn-success btn-sm me-1"
+                        title="Accept">
+                        <i class="bi bi-check-lg"></i>
+                    </a>
+                    <a href="{% url 'chatapp:decline_contact_request' request.id %}" class="btn btn-danger btn-sm"
+                        title="Decline">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
 
-                            <div class="contact-list">
-                                <div class="section-header">
-                                    <h6><i class="bi bi-person-fill me-2"></i>Contacts</h6>
-                                </div>
-                                {% for contact in contacts %}
-                                <a href="{% url 'chatapp:dashboard_chat' contact.user.id %}"
-                                    class="contact-item {% if selected_contact and selected_contact.user.id == contact.user.id %}active{% endif %}">
-                                    <div class="profile-pic-clickable">
-                                        <img src="{{ contact.profile_picture.url }}"
-                                            alt="{{ contact.display_name|default:contact.user.username }}">
-                                    </div>
-                                    <div class="contact-info">
-                                        <h6>{{ contact.display_name|default:contact.user.username }}</h6>
-                                        <small>@{{ contact.user.username }}</small>
-                                    </div>
-                                </a>
-                                {% empty %}
-                                <div class="empty-state">
-                                    <i class="bi bi-person-x"></i>
-                                    <p class="mb-0">No contacts yet</p>
-                                </div>
-                                {% endfor %}
+        <div class="contact-list">
+            <div class="section-header">
+                <h6><i class="bi bi-person-fill me-2"></i>Contacts</h6>
+            </div>
+            {% for contact in contacts %}
+            <a href="{% url 'chatapp:dashboard_chat' contact.user.id %}"
+                class="contact-item {% if selected_contact and selected_contact.user.id == contact.user.id %}active{% endif %}">
+                <div class="profile-pic-clickable">
+                    <img src="{{ contact.profile_picture.url }}"
+                        alt="{{ contact.display_name|default:contact.user.username }}">
+                </div>
+                <div class="contact-info">
+                    <h6>{{ contact.display_name|default:contact.user.username }}</h6>
+                    <small>@{{ contact.user.username }}</small>
+                </div>
+            </a>
+            {% empty %}
+            <div class="empty-state">
+                <i class="bi bi-person-x"></i>
+                <p class="mb-0">No contacts yet</p>
+            </div>
+            {% endfor %}
 
-                                <div class="section-header">
-                                    <h6><i class="bi bi-robot me-2"></i>Assistants</h6>
-                                </div>
-                                <a href="#" class="contact-item" style="cursor: not-allowed; opacity: 0.7;"
-                                    title="AI features available via /Collab in any chat">
-                                    <img src="{% static 'chatapp/images/bot_avatar.png' %}" alt="Bot"
-                                        style="border-color: var(--accent-purple);">
-                                    <div class="contact-info">
-                                        <h6>Collab-X Bot</h6>
-                                        <small>Use /Collab in any chat</small>
-                                    </div>
-                                </a>
+            <div class="section-header">
+                <h6><i class="bi bi-robot me-2"></i>Assistants</h6>
+            </div>
+            <a href="#" class="contact-item" style="cursor: not-allowed; opacity: 0.7;"
+                title="AI features available via /Collab in any chat">
+                <img src="{% static 'chatapp/images/bot_avatar.png' %}" alt="Bot"
+                    style="border-color: var(--accent-purple);">
+                <div class="contact-info">
+                    <h6>Collab-X Bot</h6>
+                    <small>Use /Collab in any chat</small>
+                </div>
+            </a>
 
-                                <div class="section-header">
-                                    <h6><i class="bi bi-people-fill me-2"></i>Groups</h6>
-                                    <button class="btn btn-primary btn-sm" title="Create Group" data-bs-toggle="modal"
-                                        data-bs-target="#createGroupModal">
-                                        <i class="bi bi-plus-lg"></i>
-                                    </button>
-                                </div>
-                                {% for group in groups %}
-                                <a href="{% url 'chatapp:dashboard_group_chat' group.id %}"
-                                    class="contact-item {% if selected_group and selected_group.id == group.id %}active{% endif %}">
-                                    <div class="group-icon">{{ group.name|first|upper }}</div>
-                                    <div class="contact-info">
-                                        <h6>{{ group.name }}</h6>
-                                        <small>{{ group.members.count }} member{{ group.members.count|pluralize
-                                            }}</small>
-                                    </div>
-                                </a>
-                                {% empty %}
-                                <div class="empty-state">
-                                    <i class="bi bi-people"></i>
-                                    <p class="mb-0">No groups yet</p>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
+            <div class="section-header">
+                <h6><i class="bi bi-people-fill me-2"></i>Groups</h6>
+                <button class="btn btn-primary btn-sm" title="Create Group" data-bs-toggle="modal"
+                    data-bs-target="#createGroupModal">
+                    <i class="bi bi-plus-lg"></i>
+                </button>
+            </div>
+            {% for group in groups %}
+            <a href="{% url 'chatapp:dashboard_group_chat' group.id %}"
+                class="contact-item {% if selected_group and selected_group.id == group.id %}active{% endif %}">
+                <div class="group-icon">{{ group.name|first|upper }}</div>
+                <div class="contact-info">
+                    <h6>{{ group.name }}</h6>
+                    <small>{{ group.members.count }} member{{ group.members.count|pluralize
+                        }}</small>
+                </div>
+            </a>
+            {% empty %}
+            <div class="empty-state">
+                <i class="bi bi-people"></i>
+                <p class="mb-0">No groups yet</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 
-                        <div class="chat-area">
-                            {% if selected_contact or selected_group %}
-                            <div class="chat-header">
-                                <div class="chat-header-info">
-                                    {% if selected_contact %}
-                                    <a href="#" class="profile-pic-clickable">
-                                        <img src="{{ selected_contact.profile_picture.url }}"
-                                            alt="{{ selected_contact.display_name|default:selected_contact.user.username }}">
-                                    </a>
-                                    <div class="chat-header-text">
-                                        <h6>{{ selected_contact.display_name|default:selected_contact.user.username }}
-                                        </h6>
-                                        <small>@{{ selected_contact.user.username }}</small>
-                                    </div>
-                                    {% elif selected_group %}
-                                    <div class="group-icon">{{ selected_group.name|first|upper }}</div>
-                                    <div class="chat-header-text">
-                                        <h6>{{ selected_group.name }}</h6>
-                                        <small>{{ selected_group.members.count }} member{{
-                                            selected_group.members.count|pluralize }}</small>
-                                    </div>
-                                    {% endif %}
-                                </div>
+    <div class="chat-area">
+        {% if selected_contact or selected_group %}
+        <div class="chat-header">
+            <div class="chat-header-info">
+                {% if selected_contact %}
+                <a href="#" class="profile-pic-clickable">
+                    <img src="{{ selected_contact.profile_picture.url }}"
+                        alt="{{ selected_contact.display_name|default:selected_contact.user.username }}">
+                </a>
+                <div class="chat-header-text">
+                    <h6>{{ selected_contact.display_name|default:selected_contact.user.username }}
+                    </h6>
+                    <small>@{{ selected_contact.user.username }}</small>
+                </div>
+                {% elif selected_group %}
+                <div class="group-icon">{{ selected_group.name|first|upper }}</div>
+                <div class="chat-header-text">
+                    <h6>{{ selected_group.name }}</h6>
+                    <small>{{ selected_group.members.count }} member{{
+                        selected_group.members.count|pluralize }}</small>
+                </div>
+                {% endif %}
+            </div>
 
-                                {% if selected_group and selected_group.creator == user %}
-                                <div class="dropdown">
-                                    <button class="btn btn-outline-secondary btn-sm" type="button"
-                                        data-bs-toggle="dropdown" aria-expanded="false"
-                                        style="border-color: var(--border-color); color: var(--text-secondary);">
-                                        <i class="bi bi-three-dots-vertical"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
-                                        <li><a class="dropdown-item"
-                                                href="{% url 'chatapp:edit_group' selected_group.id %}">
-                                                <i class="bi bi-pencil me-2"></i>Change Name
-                                            </a></li>
-                                        <li><a class="dropdown-item"
-                                                href="{% url 'chatapp:add_group_members' selected_group.id %}">
-                                                <i class="bi bi-person-plus me-2"></i>Add Members
-                                            </a></li>
-                                        <li><a class="dropdown-item"
-                                                href="{% url 'chatapp:remove_group_members' selected_group.id %}">
-                                                <i class="bi bi-person-dash me-2"></i>Remove Members
-                                            </a></li>
-                                    </ul>
-                                </div>
-                                {% endif %}
-                            </div>
+            {% if selected_group and selected_group.creator == user %}
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown"
+                    aria-expanded="false" style="border-color: var(--border-color); color: var(--text-secondary);">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+                    <li><a class="dropdown-item" href="{% url 'chatapp:edit_group' selected_group.id %}">
+                            <i class="bi bi-pencil me-2"></i>Change Name
+                        </a></li>
+                    <li><a class="dropdown-item" href="{% url 'chatapp:add_group_members' selected_group.id %}">
+                            <i class="bi bi-person-plus me-2"></i>Add Members
+                        </a></li>
+                    <li><a class="dropdown-item" href="{% url 'chatapp:remove_group_members' selected_group.id %}">
+                            <i class="bi bi-person-dash me-2"></i>Remove Members
+                        </a></li>
+                </ul>
+            </div>
+            <i class="bi bi-chat-dots"></i>
+            <p>Select a chat to start messaging</p>
+        </div>
+        {% endif %}
 
-                            <div class="chat-messages" id="chat-messages">
-                                {% for message in messages %}
-                                <div class="message-bubble {% if message.sender == user %}sent{% else %}received{% endif %}"
-                                    if (name && workspaceSocket) { workspaceSocket.send(JSON.stringify({
-                                    type: 'create_node' , name: name, node_type: 'file' , parent_id: null })); } }); }
-                                    // Real-time Editing if (codeInput) { let timeout=null;
-                                    codeInput.addEventListener('input', function () { if (activeFileId &&
-                                    workspaceSocket) { clearTimeout(timeout); timeout=setTimeout(()=> {
-                                    workspaceSocket.send(JSON.stringify({
-                                    type: 'write_file',
-                                    node_id: activeFileId,
-                                    content: codeInput.value
-                                    }));
-                                    }, 500); // Debounce 500ms
-                                    }
-                                    });
-                                    }
+        {% if selected_contact or selected_group %}
+        <div class="chat-input-area">
+            <form id="chat-form">
+                <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i></button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
 
-                                    // Send message
-                                    if (chatForm) {
-                                    chatForm.addEventListener('submit', function (e) {
-                                    e.preventDefault();
-                                    const message = messageInput.value.trim();
-                                    if (message && chatSocket) {
-                                    chatSocket.send(JSON.stringify({
-                                    type: 'chat_message',
-                                    message: message
-                                    }));
-                                    messageInput.value = '';
-                                    }
-                                    });
-                                    }
+    <div class="code-playground-panel" id="code-playground-panel">
+        <div class="code-header">
+            <h6><i class="bi bi-code-slash me-2"></i>Code Playground</h6>
+            <button class="btn btn-sm btn-primary" id="run-code-btn" title="Run Code">
+                <i class="bi bi-play-fill"></i> Run
+            </button>
+        </div>
+        <div class="code-editor-container">
+            <textarea id="code-textarea" class="code-textarea" placeholder="Write your code here..."></textarea>
+            <div id="code-output" class="output-area"></div>
+        </div>
+    </div>
 
-                                    // Run Code Logic
-                                    if (runCodeBtn && codeInput && chatSocket) {
-                                    runCodeBtn.addEventListener('click', function () {
-                                    const code = codeInput.value;
-                                    if (!code.trim()) return;
+    <div class="workspace-panel" id="workspace-panel">
+        <div class="workspace-header">
+            <h6><i class="bi bi-folder2-open me-2"></i>Workspace</h6>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"
+                    aria-expanded="false">
+                    <i class="bi bi-plus-lg"></i> New
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark">
+                    <li><a class="dropdown-item" href="#" id="create-file-btn"><i
+                                class="bi bi-file-earmark-plus me-2"></i>New File</a></li>
+                    <li><a class="dropdown-item" href="#" id="create-folder-btn"><i
+                                class="bi bi-folder-plus me-2"></i>New Folder</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="file-tree" id="file-tree">
+            <!-- File nodes will be loaded here -->
+        </div>
+        <div class="workspace-actions">
+            <button class="btn btn-sm btn-danger flex-grow-1" id="delete-node-btn" disabled><i
+                    class="bi bi-trash me-2"></i>Delete</button>
+            <button class="btn btn-sm btn-secondary flex-grow-1" id="rename-node-btn" disabled><i
+                    class="bi bi-pencil me-2"></i>Rename</button>
+        </div>
+    </div>
+</div>
 
-                                    codeOutput.textContent = "Running...";
+<button class="mobile-toggle d-md-none" id="mobileToggle">
+    <i class="bi bi-list"></i>
+</button>
+<div class="mobile-overlay" id="mobileOverlay"></div>
 
-                                    // Ensure socket is open
-                                    if (chatSocket.readyState === WebSocket.OPEN) {
-                                    chatSocket.send(JSON.stringify({
-                                    type: 'execute_code',
-                                    code: code
-                                    }));
-                                    } else {
-                                    codeOutput.textContent = "Error: Connection lost. Refresh page.";
-                                    }
-                                    });
-                                    }
-
-                                    // Delete and jump handlers
-                                    if (chatMessages) {
-                                    chatMessages.addEventListener('click', function (e) {
-                                    const deleteButton = e.target.closest('.delete-msg-btn');
-                                    if (deleteButton) {
-                                    e.preventDefault();
-                                    const messageBubble = deleteButton.closest('.message-bubble');
-                                    const messageId = messageBubble.dataset.messageId;
-
-                                    if (confirm('Delete this message?')) {
-                                    if (chatSocket && messageId) {
-                                    chatSocket.send(JSON.stringify({
-                                    type: 'delete_message',
-                                    message_id: messageId
-                                    }));
-                                    }
-                                    }
-                                    }
-
-                                    const jumpButton = e.target.closest('.jump-btn');
-                                    if (jumpButton) {
-                                    e.preventDefault();
-                                    const jumpId = jumpButton.dataset.jumpId;
-                                    const targetMessage =
-                                    document.querySelector(`.message-bubble[data-message-id='${jumpId}']`);
-
-                                    if (targetMessage) {
-                                    targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                    targetMessage.classList.add('highlight');
-                                    setTimeout(() => targetMessage.classList.remove('highlight'), 2000);
-                                    } else {
-                                    alert("Message not found in current view");
-                                    }
-                                    }
-                                    });
-                                    }
-
-                                    // Create message bubble
-                                    function createMessageBubble(content, timestamp, isSent, senderDisplayName,
-                                    messageId) {
-                                    const bubble = document.createElement('div');
-                                    bubble.className = `message-bubble ${isSent ? 'sent' : 'received'}`;
-                                    bubble.dataset.messageId = messageId;
-
-                                    if (senderDisplayName && !isSent) {
-                                    const sender = document.createElement('span');
-                                    sender.className = 'message-sender-name';
-                                    sender.textContent = senderDisplayName;
-                                    bubble.appendChild(sender);
-                                    }
-
-                                    const content_p = document.createElement('p');
-                                    content_p.textContent = content;
-                                    bubble.appendChild(content_p);
-
-                                    if (isSent) {
-                                    const deleteBtn = document.createElement('button');
-                                    deleteBtn.className = 'btn btn-danger btn-sm delete-msg-btn float-end';
-                                    deleteBtn.title = 'Delete message';
-                                    deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-                                    bubble.appendChild(deleteBtn);
-                                    }
-
-                                    const time = document.createElement('span');
-                                    time.className = 'message-time';
-                                    time.textContent = timestamp;
-                                    bubble.appendChild(time);
-
-                                    return bubble;
-                                    }
-
-                                    // Create bot message bubble
-                                    function createBotMessageBubble(content, senderUsername, jumpId, requestId) {
-                                    const bubble = document.createElement('div');
-                                    bubble.className = 'message-bubble bot';
-                                    bubble.id = `bot-response-${requestId}`;
-
-                                    const avatar = document.createElement('img');
-                                    avatar.className = 'bot-avatar';
-                                    avatar.src = "{% static 'chatapp/images/bot_avatar.png' %}";
-                                    avatar.alt = 'Bot';
-                                    bubble.appendChild(avatar);
-
-                                    const wrapper = document.createElement('div');
-                                    wrapper.className = 'bot-content-wrapper';
-
-                                    const header = document.createElement('div');
-                                    header.className = 'bot-header';
-                                    header.innerHTML = `<i class="bi bi-robot"></i>${senderUsername}`;
-                                    wrapper.appendChild(header);
-
-                                    const contentP = document.createElement('p');
-                                    contentP.id = `bot-content-${requestId}`;
-                                    contentP.textContent = content;
-                                    wrapper.appendChild(contentP);
-
-                                    const jumpContainer = document.createElement('div');
-                                    jumpContainer.id = `bot-jump-${requestId}`;
-                                    if (jumpId) {
-                                    const jumpBtn = document.createElement('button');
-                                    jumpBtn.className = 'jump-btn';
-                                    jumpBtn.textContent = 'Jump to message';
-                                    jumpBtn.dataset.jumpId = jumpId;
-                                    jumpContainer.appendChild(jumpBtn);
-                                    }
-                                    wrapper.appendChild(jumpContainer);
-
-                                    bubble.appendChild(wrapper);
-                                    return bubble;
-                                    }
-
-                                    // Search filter
-                                    const searchInput = document.getElementById('contact-search-input');
-                                    if (searchInput) {
-                                    searchInput.addEventListener('input', function () {
-                                    const filter = this.value.toLowerCase();
-                                    const items = document.querySelectorAll('.contact-list .contact-item');
-
-                                    items.forEach(function (item) {
-                                    const name = item.querySelector('.contact-info h6')?.textContent.toLowerCase() ||
-                                    '';
-                                    const username = item.querySelector('.contact-info
-                                    small')?.textContent.toLowerCase() || '';
-                                    const text = name + username;
-
-                                    item.style.display = text.includes(filter) ? 'flex' : 'none';
-                                    });
-                                    });
-                                    }
-                                    });
-                                    </script>
-                                    {% endif %}
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% else %}
-                            <div class="empty-chat-area">
-                                <i class="bi bi-chat-dots"></i>
-                                <p>Select a chat to start messaging</p>
-                            </div>
-                            {% endif %}
-
-                            {% if selected_contact or selected_group %}
-                            <div class="chat-input-area">
-                                <form id="chat-form">
-                                    <input type="text" id="message-input" placeholder="Type a message..."
-                                        autocomplete="off">
-                                    <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i></button>
-                                </form>
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <div class="code-playground-panel" id="code-playground-panel">
-                            <div class="code-header">
-                                <h6><i class="bi bi-code-slash me-2"></i>Code Playground</h6>
-                                <button class="btn btn-sm btn-primary" id="run-code-btn" title="Run Code">
-                                    <i class="bi bi-play-fill"></i> Run
-                                </button>
-                            </div>
-                            <div class="code-editor-container">
-                                <textarea id="code-textarea" class="code-textarea"
-                                    placeholder="Write your code here..."></textarea>
-                                <div id="code-output" class="output-area"></div>
-                            </div>
-                        </div>
-
-                        <div class="workspace-panel" id="workspace-panel">
-                            <div class="workspace-header">
-                                <h6><i class="bi bi-folder2-open me-2"></i>Workspace</h6>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-                                        data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="bi bi-plus-lg"></i> New
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-dark">
-                                        <li><a class="dropdown-item" href="#" id="create-file-btn"><i
-                                                    class="bi bi-file-earmark-plus me-2"></i>New File</a></li>
-                                        <li><a class="dropdown-item" href="#" id="create-folder-btn"><i
-                                                    class="bi bi-folder-plus me-2"></i>New Folder</a></li>
-                                    </ul>
-                                </div>
-                            </div>
-                            <div class="file-tree" id="file-tree">
-                                <!-- File nodes will be loaded here -->
-                            </div>
-                            <div class="workspace-actions">
-                                <button class="btn btn-sm btn-danger flex-grow-1" id="delete-node-btn" disabled><i
-                                        class="bi bi-trash me-2"></i>Delete</button>
-                                <button class="btn btn-sm btn-secondary flex-grow-1" id="rename-node-btn" disabled><i
-                                        class="bi bi-pencil me-2"></i>Rename</button>
-                            </div>
+<!-- Create Group Modal -->
+<div class="modal fade" id="createGroupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title" style="color: var(--text-primary); font-family: 'Fira Code', monospace;">
+                    <i class="bi bi-people-fill me-2"></i>Create Group
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="create-group-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="group-name" class="form-label" style="color: var(--text-secondary);">Group
+                            Name</label>
+                        <input type="text" class="form-control" id="group-name" name="name" required
+                            style="background: var(--darker-bg); color: var(--text-primary); border: 1px solid var(--border-color);">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color: var(--text-secondary);">Select
+                            Members</label>
+                        <div class="list-group" style="max-height: 200px; overflow-y: auto;">
+                            {% for contact in contacts %}
+                            <label class="list-group-item d-flex gap-2"
+                                style="background: var(--darker-bg); color: var(--text-primary); border: 1px solid var(--border-color);">
+                                <input class="form-check-input flex-shrink-0" type="checkbox" name="members"
+                                    value="{{ contact.user.id }}">
+                                <span>
+                                    {{ contact.display_name|default:contact.user.username }}
+                                    <small class="text-muted d-block">@{{ contact.user.username
+                                        }}</small>
+                                </span>
+                            </label>
+                            {% endfor %}
                         </div>
                     </div>
-
-                    <button class="mobile-toggle d-md-none" id="mobileToggle">
-                        <i class="bi bi-list"></i>
-                    </button>
-                    <div class="mobile-overlay" id="mobileOverlay"></div>
-
-                    <!-- Create Group Modal -->
-                    <div class="modal fade" id="createGroupModal" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content"
-                                style="background: var(--card-bg); border: 1px solid var(--border-color);">
-                                <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
-                                    <h5 class="modal-title"
-                                        style="color: var(--text-primary); font-family: 'Fira Code', monospace;">
-                                        <i class="bi bi-people-fill me-2"></i>Create Group
-                                    </h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                                        aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <form id="create-group-form">
-                                        {% csrf_token %}
-                                        <div class="mb-3">
-                                            <label for="group-name" class="form-label"
-                                                style="color: var(--text-secondary);">Group Name</label>
-                                            <input type="text" class="form-control" id="group-name" name="name" required
-                                                style="background: var(--darker-bg); color: var(--text-primary); border: 1px solid var(--border-color);">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label" style="color: var(--text-secondary);">Select
-                                                Members</label>
-                                            <div class="list-group" style="max-height: 200px; overflow-y: auto;">
-                                                {% for contact in contacts %}
-                                                <label class="list-group-item d-flex gap-2"
-                                                    style="background: var(--darker-bg); color: var(--text-primary); border: 1px solid var(--border-color);">
-                                                    <input class="form-check-input flex-shrink-0" type="checkbox"
-                                                        name="members" value="{{ contact.user.id }}">
-                                                    <span>
-                                                        {{ contact.display_name|default:contact.user.username }}
-                                                        <small class="text-muted d-block">@{{ contact.user.username
-                                                            }}</small>
-                                                    </span>
-                                                </label>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                        <div class="d-grid">
-                                            <button type="submit" class="btn btn-primary">Create Group</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Create Group</button>
                     </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
-                    {% endblock %}
+{% endblock %}
 
-                    {% block extra_js %}
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function () {
-                            const chatContainer = document.querySelector('.chat-container');
-                            const chatType = chatContainer.dataset.chatType;
-                            const chatId = chatContainer.dataset.chatId;
-                            const workspaceKey = chatContainer.dataset.workspaceKey;
-                            const currentUsername = chatContainer.dataset.currentUsername;
-                            const botAvatar = chatContainer.dataset.botAvatar;
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const chatContainer = document.querySelector('.chat-container');
+        const chatType = chatContainer.dataset.chatType;
+        const chatId = chatContainer.dataset.chatId;
+        const workspaceKey = chatContainer.dataset.workspaceKey;
+        const currentUsername = chatContainer.dataset.currentUsername;
+        const botAvatar = chatContainer.dataset.botAvatar;
 
-                            const chatMessages = document.getElementById('chat-messages');
-                            const messageInput = document.getElementById('message-input');
-                            const chatForm = document.getElementById('chat-form');
-                            const codeInput = document.getElementById('code-textarea');
-                            const codeOutput = document.getElementById('code-output');
-                            const runCodeBtn = document.getElementById('run-code-btn');
+        const chatMessages = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('message-input');
+        const chatForm = document.getElementById('chat-form');
+        const codeInput = document.getElementById('code-textarea');
+        const codeOutput = document.getElementById('code-output');
+        const runCodeBtn = document.getElementById('run-code-btn');
 
-                            // WebSocket setup
-                            let chatSocket = null;
-                            let workspaceSocket = null;
+        // WebSocket setup
+        let chatSocket = null;
+        let workspaceSocket = null;
 
-                            if (chatType && chatId) {
-                                chatSocket = new WebSocket(
-                                    'ws://' + window.location.host +
-                                    '/ws/chat/' + chatType + '/' + chatId + '/'
-                                );
+        if (chatType && chatId) {
+            chatSocket = new WebSocket(
+                'ws://' + window.location.host +
+                '/ws/chat/' + chatType + '/' + chatId + '/'
+            );
 
-                                chatSocket.onmessage = function (e) {
-                                    const data = JSON.parse(e.data);
-                                    console.log('Chat Socket Message:', data);
+            chatSocket.onmessage = function (e) {
+                const data = JSON.parse(e.data);
+                console.log('Chat Socket Message:', data);
 
-                                    if (data.type === 'chat_message') {
-                                        const isSent = data.sender_username === currentUsername;
-                                        const senderDisplayName = data.sender_display_name;
-                                        const bubble = createMessageBubble(data.message, data.timestamp, isSent, senderDisplayName, data.message_id);
-                                        chatMessages.appendChild(bubble);
-                                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                                    } else if (data.type === 'bot_message') {
-                                        const botBubble = createBotMessageBubble(data.message, data.sender_username, data.jump_id, data.request_id);
-                                        chatMessages.appendChild(botBubble);
-                                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                                    } else if (data.type === 'bot_message_update') {
-                                        const botContent = document.getElementById(`bot-content-${data.request_id}`);
-                                        if (botContent) {
-                                            botContent.textContent = data.message;
-                                        }
-                                        const botJumpContainer = document.getElementById(`bot-jump-${data.request_id}`);
-                                        if (botJumpContainer && data.jump_id && !botJumpContainer.querySelector('.jump-btn')) {
-                                            const jumpBtn = document.createElement('button');
-                                            jumpBtn.className = 'jump-btn';
-                                            jumpBtn.textContent = 'Jump to message';
-                                            jumpBtn.dataset.jumpId = data.jump_id;
-                                            botJumpContainer.appendChild(jumpBtn);
-                                        }
-                                    } else if (data.type === 'message_deleted') {
-                                        const messageBubble = document.querySelector(`.message-bubble[data-message-id='${data.message_id}']`);
-                                        if (messageBubble) {
-                                            messageBubble.remove();
-                                        }
-                                    } else if (data.type === 'code_output') {
-                                        codeOutput.textContent = data.output;
-                                    }
-                                };
+                if (data.type === 'chat_message') {
+                    const isSent = data.sender_username === currentUsername;
+                    const senderDisplayName = data.sender_display_name;
+                    const bubble = createMessageBubble(data.message, data.timestamp, isSent, senderDisplayName, data.message_id);
+                    chatMessages.appendChild(bubble);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                } else if (data.type === 'bot_message') {
+                    const botBubble = createBotMessageBubble(data.message, data.sender_username, data.jump_id, data.request_id);
+                    chatMessages.appendChild(botBubble);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                } else if (data.type === 'bot_message_update') {
+                    const botContent = document.getElementById(`bot-content-${data.request_id}`);
+                    if (botContent) {
+                        botContent.textContent = data.message;
+                    }
+                    const botJumpContainer = document.getElementById(`bot-jump-${data.request_id}`);
+                    if (botJumpContainer && data.jump_id && !botJumpContainer.querySelector('.jump-btn')) {
+                        const jumpBtn = document.createElement('button');
+                        jumpBtn.className = 'jump-btn';
+                        jumpBtn.textContent = 'Jump to message';
+                        jumpBtn.dataset.jumpId = data.jump_id;
+                        botJumpContainer.appendChild(jumpBtn);
+                    }
+                } else if (data.type === 'message_deleted') {
+                    const messageBubble = document.querySelector(`.message-bubble[data-message-id='${data.message_id}']`);
+                    if (messageBubble) {
+                        messageBubble.remove();
+                    }
+                } else if (data.type === 'code_output') {
+                    codeOutput.textContent = data.output;
+                }
+            };
 
-                                chatSocket.onclose = function (e) {
-                                    console.error('Chat socket closed unexpectedly');
-                                };
+            chatSocket.onclose = function (e) {
+                console.error('Chat socket closed unexpectedly');
+            };
+        }
+
+        if (workspaceKey) {
+            workspaceSocket = new WebSocket(
+                'ws://' + window.location.host +
+                '/ws/workspace/' + workspaceKey + '/'
+            );
+
+            workspaceSocket.onmessage = function (e) {
+                const data = JSON.parse(e.data);
+                console.log('Workspace Socket Message:', data);
+
+                if (data.type === 'workspace_init' || data.type === 'node_created' || data.type === 'node_deleted' || data.type === 'node_renamed') {
+                    renderFileTree(data.tree);
+                    if (data.type === 'node_created' && data.node.node_type === 'file') {
+                        // Automatically open new files
+                        openFile(data.node.id, data.node.name, data.node.content);
+                    }
+                } else if (data.type === 'file_content') {
+                    if (data.node_id === activeFileId) {
+                        codeInput.value = data.content;
+                    }
+                } else if (data.type === 'file_updated') {
+                    if (data.node_id === activeFileId) {
+                        // Only update if the change didn't originate from this client
+                        // (simple check, could be improved with client-side tracking)
+                        if (codeInput.value !== data.content) {
+                            codeInput.value = data.content;
+                        }
+                    }
+                }
+            };
+
+            workspaceSocket.onclose = function (e) {
+                console.error('Workspace socket closed unexpectedly');
+            };
+        }
+
+        // Sidebar Toggles
+        const sidebar = document.getElementById('sidebar');
+        const mobileToggle = document.getElementById('mobileToggle');
+        const mobileOverlay = document.getElementById('mobileOverlay');
+
+        mobileToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            mobileOverlay.classList.toggle('active');
+        });
+
+        mobileOverlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            mobileOverlay.classList.remove('active');
+        });
+
+        // Code Playground Toggle
+        const toggleCodePanelBtn = document.getElementById('toggle-code-panel');
+        const codePlaygroundPanel = document.getElementById('code-playground-panel');
+
+        toggleCodePanelBtn.addEventListener('click', () => {
+            codePlaygroundPanel.classList.toggle('open');
+        });
+
+        // Workspace Panel Toggle
+        const toggleWorkspacePanelBtn = document.getElementById('toggle-workspace-panel');
+        const workspacePanel = document.getElementById('workspace-panel');
+
+        toggleWorkspacePanelBtn.addEventListener('click', () => {
+            workspacePanel.classList.toggle('open');
+        });
+
+        // File Tree Logic
+        const fileTreeContainer = document.getElementById('file-tree');
+        let activeFileId = null;
+
+        function renderFileTree(nodes, parentElement = fileTreeContainer) {
+            if (parentElement === fileTreeContainer) {
+                parentElement.innerHTML = ''; // Clear existing tree for re-render
+            }
+
+            nodes.sort((a, b) => {
+                if (a.node_type === 'folder' && b.node_type === 'file') return -1;
+                if (a.node_type === 'file' && b.node_type === 'folder') return 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            nodes.forEach(node => {
+                const nodeElement = document.createElement('div');
+                nodeElement.className = `file-node ${node.node_type}`;
+                nodeElement.dataset.nodeId = node.id;
+                nodeElement.dataset.nodeType = node.node_type;
+                nodeElement.dataset.nodeName = node.name;
+
+                const icon = document.createElement('i');
+                icon.className = node.node_type === 'folder' ? 'bi bi-folder-fill' : 'bi bi-file-earmark';
+                nodeElement.appendChild(icon);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = node.name;
+                nodeElement.appendChild(nameSpan);
+
+                if (node.id === activeFileId) {
+                    nodeElement.classList.add('active');
+                }
+
+                parentElement.appendChild(nodeElement);
+
+                if (node.children && node.children.length > 0) {
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'file-node-children';
+                    childrenContainer.style.paddingLeft = '1rem';
+                    nodeElement.appendChild(childrenContainer);
+                    renderFileTree(node.children, childrenContainer);
+                }
+            });
+        }
+
+        function openFile(fileId, fileName, content) {
+            activeFileId = fileId;
+            codeInput.value = content;
+            document.querySelectorAll('.file-node').forEach(node => node.classList.remove('active'));
+            document.querySelector(`.file-node[data-node-id='${fileId}']`).classList.add('active');
+            // Optionally update header or title
+        }
+
+        // File tree click handler
+        fileTreeContainer.addEventListener('click', function (e) {
+            const nodeElement = e.target.closest('.file-node');
+            if (nodeElement) {
+                const nodeId = nodeElement.dataset.nodeId;
+                const nodeType = nodeElement.dataset.nodeType;
+                const nodeName = nodeElement.dataset.nodeName;
+
+                // Enable/disable delete/rename buttons
+                document.getElementById('delete-node-btn').disabled = false;
+                document.getElementById('rename-node-btn').disabled = false;
+
+                if (nodeType === 'file') {
+                    if (workspaceSocket && nodeId) {
+                        workspaceSocket.send(JSON.stringify({
+                            type: 'read_file',
+                            node_id: nodeId
+                        }));
+                        openFile(nodeId, nodeName, ''); // Content will be filled by socket response
+                    }
+                } else if (nodeType === 'folder') {
+                    // Handle folder click (e.g., expand/collapse)
+                    // For now, just activate it
+                    document.querySelectorAll('.file-node').forEach(node => node.classList.remove('active'));
+                    nodeElement.classList.add('active');
+                    activeFileId = null; // No file is active if a folder is selected
+                    codeInput.value = ''; // Clear code editor
+                }
+            }
+        });
+
+        // Create File/Folder
+        document.getElementById('create-file-btn').addEventListener('click', function () {
+            const name = prompt('Enter new file name:');
+            if (name && workspaceSocket) {
+                const parentNode = document.querySelector('.file-node.active[data-node-type="folder"]');
+                const parentId = parentNode ? parentNode.dataset.nodeId : null;
+                workspaceSocket.send(JSON.stringify({
+                    type: 'create_node',
+                    name: name,
+                    node_type: 'file',
+                    parent_id: parentId
+                }));
+            }
+        });
+
+        document.getElementById('create-folder-btn').addEventListener('click', function () {
+            const name = prompt('Enter new folder name:');
+            if (name && workspaceSocket) {
+                const parentNode = document.querySelector('.file-node.active[data-node-type="folder"]');
+                const parentId = parentNode ? parentNode.dataset.nodeId : null;
+                workspaceSocket.send(JSON.stringify({
+                    type: 'create_node',
+                    name: name,
+                    node_type: 'folder',
+                    parent_id: parentId
+                }));
+            }
+        });
+
+        // Delete Node
+        document.getElementById('delete-node-btn').addEventListener('click', function () {
+            const activeNode = document.querySelector('.file-node.active');
+            if (activeNode && confirm(`Are you sure you want to delete "${activeNode.dataset.nodeName}"?`)) {
+                if (workspaceSocket) {
+                    workspaceSocket.send(JSON.stringify({
+                        type: 'delete_node',
+                        node_id: activeNode.dataset.nodeId
+                    }));
+                    if (activeNode.dataset.nodeId === activeFileId) {
+                        activeFileId = null;
+                        codeInput.value = '';
+                    }
+                    document.getElementById('delete-node-btn').disabled = true;
+                    document.getElementById('rename-node-btn').disabled = true;
+                }
+            }
+        });
+
+        // Rename Node
+        document.getElementById('rename-node-btn').addEventListener('click', function () {
+            const activeNode = document.querySelector('.file-node.active');
+            if (activeNode) {
+                const newName = prompt(`Rename "${activeNode.dataset.nodeName}" to:`, activeNode.dataset.nodeName);
+                if (newName && newName !== activeNode.dataset.nodeName && workspaceSocket) {
+                    workspaceSocket.send(JSON.stringify({
+                        type: 'rename_node',
+                        node_id: activeNode.dataset.nodeId,
+                        new_name: newName
+                    }));
+                }
+            }
+        });
+
+        // Real-time Editing
+        if (codeInput) {
+            let timeout = null;
+            codeInput.addEventListener('input', function () {
+                if (activeFileId && workspaceSocket) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => {
+                        workspaceSocket.send(JSON.stringify({
+                            type: 'write_file',
+                            node_id: activeFileId,
+                            content: codeInput.value
+                        }));
+                    }, 500); // Debounce 500ms
+                }
+            });
+        }
+
+        // Send message
+        if (chatForm) {
+            chatForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const message = messageInput.value.trim();
+                if (message && chatSocket) {
+                    chatSocket.send(JSON.stringify({
+                        type: 'chat_message',
+                        message: message
+                    }));
+                    messageInput.value = '';
+                }
+            });
+        }
+
+        // Run Code Logic
+        if (runCodeBtn && codeInput && chatSocket) {
+            runCodeBtn.addEventListener('click', function () {
+                const code = codeInput.value;
+                if (!code.trim()) return;
+
+                codeOutput.textContent = "Running...";
+
+                // Ensure socket is open
+                if (chatSocket.readyState === WebSocket.OPEN) {
+                    chatSocket.send(JSON.stringify({
+                        type: 'execute_code',
+                        code: code
+                    }));
+                } else {
+                    codeOutput.textContent = "Error: Connection lost. Refresh page.";
+                }
+            });
+        }
+
+        // Delete and jump handlers
+        if (chatMessages) {
+            chatMessages.addEventListener('click', function (e) {
+                const deleteButton = e.target.closest('.delete-msg-btn');
+                if (deleteButton) {
+                    e.preventDefault();
+                    const messageBubble = deleteButton.closest('.message-bubble');
+                    const messageId = messageBubble.dataset.messageId;
+
+                    if (confirm('Delete this message?')) {
+                        if (chatSocket && messageId) {
+                            chatSocket.send(JSON.stringify({
+                                type: 'delete_message',
+                                message_id: messageId
+                            }));
+                        }
+                    }
+                }
+
+                const jumpButton = e.target.closest('.jump-btn');
+                if (jumpButton) {
+                    e.preventDefault();
+                    const jumpId = jumpButton.dataset.jumpId;
+                    const targetMessage = document.querySelector(`.message-bubble[data-message-id='${jumpId}']`);
+
+                    if (targetMessage) {
+                        targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetMessage.classList.add('highlight');
+                        setTimeout(() => targetMessage.classList.remove('highlight'), 2000);
+                    } else {
+                        alert("Message not found in current view");
+                    }
+                }
+            });
+        }
+
+        // Create message bubble
+        function createMessageBubble(content, timestamp, isSent, senderDisplayName, messageId) {
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${isSent ? 'sent' : 'received'}`;
+            bubble.dataset.messageId = messageId;
+
+            if (senderDisplayName && !isSent) {
+                const sender = document.createElement('span');
+                sender.className = 'message-sender-name';
+                sender.textContent = senderDisplayName;
+                bubble.appendChild(sender);
+            }
+
+            const content_p = document.createElement('p');
+            content_p.textContent = content;
+            bubble.appendChild(content_p);
+
+            if (isSent) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-danger btn-sm delete-msg-btn float-end';
+                deleteBtn.title = 'Delete message';
+                deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+                bubble.appendChild(deleteBtn);
+            }
+
+            const time = document.createElement('span');
+            time.className = 'message-time';
+            time.textContent = timestamp;
+            bubble.appendChild(time);
+
+            return bubble;
+        }
+
+        // Create bot message bubble
+        function createBotMessageBubble(content, senderUsername, jumpId, requestId) {
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble bot';
+            bubble.id = `bot-response-${requestId}`;
+
+            const avatar = document.createElement('img');
+            avatar.className = 'bot-avatar';
+            avatar.src = "{% static 'chatapp/images/bot_avatar.png' %}";
+            avatar.alt = 'Bot';
+            bubble.appendChild(avatar);
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'bot-content-wrapper';
+
+            const header = document.createElement('div');
+            header.className = 'bot-header';
+            header.innerHTML = `<i class="bi bi-robot"></i>${senderUsername}`;
+            wrapper.appendChild(header);
+
+            const contentP = document.createElement('p');
+            contentP.id = `bot-content-${requestId}`;
+            contentP.textContent = content;
+            wrapper.appendChild(contentP);
+
+            const jumpContainer = document.createElement('div');
+            jumpContainer.id = `bot-jump-${requestId}`;
+            if (jumpId) {
+                const jumpBtn = document.createElement('button');
+                jumpBtn.className = 'jump-btn';
+                jumpBtn.textContent = 'Jump to message';
+                jumpBtn.dataset.jumpId = jumpId;
+                jumpContainer.appendChild(jumpBtn);
+            }
+            wrapper.appendChild(jumpContainer);
+
+            bubble.appendChild(wrapper);
+            return bubble;
+        }
+
+        // Search filter
+        const searchInput = document.getElementById('contact-search-input');
+        if (searchInput) {
+            searchInput.addEventListener('input', function () {
+                const filter = this.value.toLowerCase();
+                const items = document.querySelectorAll('.contact-list .contact-item');
+
+                items.forEach(function (item) {
+                    const name = item.querySelector('.contact-info h6')?.textContent.toLowerCase() || '';
+                    const username = item.querySelector('.contact-info small')?.textContent.toLowerCase() || '';
+                    const text = name + username;
+
+                    item.style.display = text.includes(filter) ? 'flex' : 'none';
+                });
+            });
+        }
+
+        // Dynamic Contact Requests
+        document.querySelectorAll('.contact-requests .btn').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                const url = this.getAttribute('href');
+                const requestItem = this.closest('.request-item');
+
+                fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            requestItem.remove();
+                            // If accepting, reload to show new contact (or dynamically add it - simplified for now)
+                            if (url.includes('accept')) {
+                                window.location.reload();
                             }
-
-                            if (workspaceKey) {
-                                workspaceSocket = new WebSocket(
-                                    'ws://' + window.location.host +
-                                    '/ws/workspace/' + workspaceKey + '/'
-                                );
-
-                                workspaceSocket.onmessage = function (e) {
-                                    const data = JSON.parse(e.data);
-                                    console.log('Workspace Socket Message:', data);
-
-                                    if (data.type === 'workspace_init' || data.type === 'node_created' || data.type === 'node_deleted' || data.type === 'node_renamed') {
-                                        renderFileTree(data.tree);
-                                        if (data.type === 'node_created' && data.node.node_type === 'file') {
-                                            // Automatically open new files
-                                            openFile(data.node.id, data.node.name, data.node.content);
-                                        }
-                                    } else if (data.type === 'file_content') {
-                                        if (data.node_id === activeFileId) {
-                                            codeInput.value = data.content;
-                                        }
-                                    } else if (data.type === 'file_updated') {
-                                        if (data.node_id === activeFileId) {
-                                            // Only update if the change didn't originate from this client
-                                            // (simple check, could be improved with client-side tracking)
-                                            if (codeInput.value !== data.content) {
-                                                codeInput.value = data.content;
-                                            }
-                                        }
-                                    }
-                                };
-
-                                workspaceSocket.onclose = function (e) {
-                                    console.error('Workspace socket closed unexpectedly');
-                                };
+                            // Check if no more requests, hide section
+                            if (document.querySelectorAll('.request-item').length === 0) {
+                                document.querySelector('.contact-requests').remove();
                             }
+                        } else {
+                            alert(data.message);
+                        }
+                    })
+                    .catch(err => console.error('Error:', err));
+            });
+        });
 
-                            // Sidebar Toggles
-                            const sidebar = document.getElementById('sidebar');
-                            const mobileToggle = document.getElementById('mobileToggle');
-                            const mobileOverlay = document.getElementById('mobileOverlay');
+        // Dynamic Group Creation
+        const createGroupForm = document.getElementById('create-group-form');
+        if (createGroupForm) {
+            createGroupForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const formData = new FormData(this);
 
-                            mobileToggle.addEventListener('click', () => {
-                                sidebar.classList.toggle('open');
-                                mobileOverlay.classList.toggle('active');
-                            });
-
-                            mobileOverlay.addEventListener('click', () => {
-                                sidebar.classList.remove('open');
-                                mobileOverlay.classList.remove('active');
-                            });
-
-                            // Code Playground Toggle
-                            const toggleCodePanelBtn = document.getElementById('toggle-code-panel');
-                            const codePlaygroundPanel = document.getElementById('code-playground-panel');
-
-                            toggleCodePanelBtn.addEventListener('click', () => {
-                                codePlaygroundPanel.classList.toggle('open');
-                            });
-
-                            // Workspace Panel Toggle
-                            const toggleWorkspacePanelBtn = document.getElementById('toggle-workspace-panel');
-                            const workspacePanel = document.getElementById('workspace-panel');
-
-                            toggleWorkspacePanelBtn.addEventListener('click', () => {
-                                workspacePanel.classList.toggle('open');
-                            });
-
-                            // File Tree Logic
-                            const fileTreeContainer = document.getElementById('file-tree');
-                            let activeFileId = null;
-
-                            function renderFileTree(nodes, parentElement = fileTreeContainer) {
-                                if (parentElement === fileTreeContainer) {
-                                    parentElement.innerHTML = ''; // Clear existing tree for re-render
-                                }
-
-                                nodes.sort((a, b) => {
-                                    if (a.node_type === 'folder' && b.node_type === 'file') return -1;
-                                    if (a.node_type === 'file' && b.node_type === 'folder') return 1;
-                                    return a.name.localeCompare(b.name);
-                                });
-
-                                nodes.forEach(node => {
-                                    const nodeElement = document.createElement('div');
-                                    nodeElement.className = `file-node ${node.node_type}`;
-                                    nodeElement.dataset.nodeId = node.id;
-                                    nodeElement.dataset.nodeType = node.node_type;
-                                    nodeElement.dataset.nodeName = node.name;
-
-                                    const icon = document.createElement('i');
-                                    icon.className = node.node_type === 'folder' ? 'bi bi-folder-fill' : 'bi bi-file-earmark';
-                                    nodeElement.appendChild(icon);
-
-                                    const nameSpan = document.createElement('span');
-                                    nameSpan.textContent = node.name;
-                                    nodeElement.appendChild(nameSpan);
-
-                                    if (node.id === activeFileId) {
-                                        nodeElement.classList.add('active');
-                                    }
-
-                                    parentElement.appendChild(nodeElement);
-
-                                    if (node.children && node.children.length > 0) {
-                                        const childrenContainer = document.createElement('div');
-                                        childrenContainer.className = 'file-node-children';
-                                        childrenContainer.style.paddingLeft = '1rem';
-                                        nodeElement.appendChild(childrenContainer);
-                                        renderFileTree(node.children, childrenContainer);
-                                    }
-                                });
-                            }
-
-                            function openFile(fileId, fileName, content) {
-                                activeFileId = fileId;
-                                codeInput.value = content;
-                                document.querySelectorAll('.file-node').forEach(node => node.classList.remove('active'));
-                                document.querySelector(`.file-node[data-node-id='${fileId}']`).classList.add('active');
-                                // Optionally update header or title
-                            }
-
-                            // File tree click handler
-                            fileTreeContainer.addEventListener('click', function (e) {
-                                const nodeElement = e.target.closest('.file-node');
-                                if (nodeElement) {
-                                    const nodeId = nodeElement.dataset.nodeId;
-                                    const nodeType = nodeElement.dataset.nodeType;
-                                    const nodeName = nodeElement.dataset.nodeName;
-
-                                    // Enable/disable delete/rename buttons
-                                    document.getElementById('delete-node-btn').disabled = false;
-                                    document.getElementById('rename-node-btn').disabled = false;
-
-                                    if (nodeType === 'file') {
-                                        if (workspaceSocket && nodeId) {
-                                            workspaceSocket.send(JSON.stringify({
-                                                type: 'read_file',
-                                                node_id: nodeId
-                                            }));
-                                            openFile(nodeId, nodeName, ''); // Content will be filled by socket response
-                                        }
-                                    } else if (nodeType === 'folder') {
-                                        // Handle folder click (e.g., expand/collapse)
-                                        // For now, just activate it
-                                        document.querySelectorAll('.file-node').forEach(node => node.classList.remove('active'));
-                                        nodeElement.classList.add('active');
-                                        activeFileId = null; // No file is active if a folder is selected
-                                        codeInput.value = ''; // Clear code editor
-                                    }
-                                }
-                            });
-
-                            // Create File/Folder
-                            document.getElementById('create-file-btn').addEventListener('click', function () {
-                                const name = prompt('Enter new file name:');
-                                if (name && workspaceSocket) {
-                                    const parentNode = document.querySelector('.file-node.active[data-node-type="folder"]');
-                                    const parentId = parentNode ? parentNode.dataset.nodeId : null;
-                                    workspaceSocket.send(JSON.stringify({
-                                        type: 'create_node',
-                                        name: name,
-                                        node_type: 'file',
-                                        parent_id: parentId
-                                    }));
-                                }
-                            });
-
-                            document.getElementById('create-folder-btn').addEventListener('click', function () {
-                                const name = prompt('Enter new folder name:');
-                                if (name && workspaceSocket) {
-                                    const parentNode = document.querySelector('.file-node.active[data-node-type="folder"]');
-                                    const parentId = parentNode ? parentNode.dataset.nodeId : null;
-                                    workspaceSocket.send(JSON.stringify({
-                                        type: 'create_node',
-                                        name: name,
-                                        node_type: 'folder',
-                                        parent_id: parentId
-                                    }));
-                                }
-                            });
-
-                            // Delete Node
-                            document.getElementById('delete-node-btn').addEventListener('click', function () {
-                                const activeNode = document.querySelector('.file-node.active');
-                                if (activeNode && confirm(`Are you sure you want to delete "${activeNode.dataset.nodeName}"?`)) {
-                                    if (workspaceSocket) {
-                                        workspaceSocket.send(JSON.stringify({
-                                            type: 'delete_node',
-                                            node_id: activeNode.dataset.nodeId
-                                        }));
-                                        if (activeNode.dataset.nodeId === activeFileId) {
-                                            activeFileId = null;
-                                            codeInput.value = '';
-                                        }
-                                        document.getElementById('delete-node-btn').disabled = true;
-                                        document.getElementById('rename-node-btn').disabled = true;
-                                    }
-                                }
-                            });
-
-                            // Rename Node
-                            document.getElementById('rename-node-btn').addEventListener('click', function () {
-                                const activeNode = document.querySelector('.file-node.active');
-                                if (activeNode) {
-                                    const newName = prompt(`Rename "${activeNode.dataset.nodeName}" to:`, activeNode.dataset.nodeName);
-                                    if (newName && newName !== activeNode.dataset.nodeName && workspaceSocket) {
-                                        workspaceSocket.send(JSON.stringify({
-                                            type: 'rename_node',
-                                            node_id: activeNode.dataset.nodeId,
-                                            new_name: newName
-                                        }));
-                                    }
-                                }
-                            });
-
-                            // Real-time Editing
-                            if (codeInput) {
-                                let timeout = null;
-                                codeInput.addEventListener('input', function () {
-                                    if (activeFileId && workspaceSocket) {
-                                        clearTimeout(timeout);
-                                        timeout = setTimeout(() => {
-                                            workspaceSocket.send(JSON.stringify({
-                                                type: 'write_file',
-                                                node_id: activeFileId,
-                                                content: codeInput.value
-                                            }));
-                                        }, 500); // Debounce 500ms
-                                    }
-                                });
-                            }
-
-                            // Send message
-                            if (chatForm) {
-                                chatForm.addEventListener('submit', function (e) {
-                                    e.preventDefault();
-                                    const message = messageInput.value.trim();
-                                    if (message && chatSocket) {
-                                        chatSocket.send(JSON.stringify({
-                                            type: 'chat_message',
-                                            message: message
-                                        }));
-                                        messageInput.value = '';
-                                    }
-                                });
-                            }
-
-                            // Run Code Logic
-                            if (runCodeBtn && codeInput && chatSocket) {
-                                runCodeBtn.addEventListener('click', function () {
-                                    const code = codeInput.value;
-                                    if (!code.trim()) return;
-
-                                    codeOutput.textContent = "Running...";
-
-                                    // Ensure socket is open
-                                    if (chatSocket.readyState === WebSocket.OPEN) {
-                                        chatSocket.send(JSON.stringify({
-                                            type: 'execute_code',
-                                            code: code
-                                        }));
-                                    } else {
-                                        codeOutput.textContent = "Error: Connection lost. Refresh page.";
-                                    }
-                                });
-                            }
-
-                            // Delete and jump handlers
-                            if (chatMessages) {
-                                chatMessages.addEventListener('click', function (e) {
-                                    const deleteButton = e.target.closest('.delete-msg-btn');
-                                    if (deleteButton) {
-                                        e.preventDefault();
-                                        const messageBubble = deleteButton.closest('.message-bubble');
-                                        const messageId = messageBubble.dataset.messageId;
-
-                                        if (confirm('Delete this message?')) {
-                                            if (chatSocket && messageId) {
-                                                chatSocket.send(JSON.stringify({
-                                                    type: 'delete_message',
-                                                    message_id: messageId
-                                                }));
-                                            }
-                                        }
-                                    }
-
-                                    const jumpButton = e.target.closest('.jump-btn');
-                                    if (jumpButton) {
-                                        e.preventDefault();
-                                        const jumpId = jumpButton.dataset.jumpId;
-                                        const targetMessage = document.querySelector(`.message-bubble[data-message-id='${jumpId}']`);
-
-                                        if (targetMessage) {
-                                            targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                            targetMessage.classList.add('highlight');
-                                            setTimeout(() => targetMessage.classList.remove('highlight'), 2000);
-                                        } else {
-                                            alert("Message not found in current view");
-                                        }
-                                    }
-                                });
-                            }
-
-                            // Create message bubble
-                            function createMessageBubble(content, timestamp, isSent, senderDisplayName, messageId) {
-                                const bubble = document.createElement('div');
-                                bubble.className = `message-bubble ${isSent ? 'sent' : 'received'}`;
-                                bubble.dataset.messageId = messageId;
-
-                                if (senderDisplayName && !isSent) {
-                                    const sender = document.createElement('span');
-                                    sender.className = 'message-sender-name';
-                                    sender.textContent = senderDisplayName;
-                                    bubble.appendChild(sender);
-                                }
-
-                                const content_p = document.createElement('p');
-                                content_p.textContent = content;
-                                bubble.appendChild(content_p);
-
-                                if (isSent) {
-                                    const deleteBtn = document.createElement('button');
-                                    deleteBtn.className = 'btn btn-danger btn-sm delete-msg-btn float-end';
-                                    deleteBtn.title = 'Delete message';
-                                    deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-                                    bubble.appendChild(deleteBtn);
-                                }
-
-                                const time = document.createElement('span');
-                                time.className = 'message-time';
-                                time.textContent = timestamp;
-                                bubble.appendChild(time);
-
-                                return bubble;
-                            }
-
-                            // Create bot message bubble
-                            function createBotMessageBubble(content, senderUsername, jumpId, requestId) {
-                                const bubble = document.createElement('div');
-                                bubble.className = 'message-bubble bot';
-                                bubble.id = `bot-response-${requestId}`;
-
-                                const avatar = document.createElement('img');
-                                avatar.className = 'bot-avatar';
-                                avatar.src = "{% static 'chatapp/images/bot_avatar.png' %}";
-                                avatar.alt = 'Bot';
-                                bubble.appendChild(avatar);
-
-                                const wrapper = document.createElement('div');
-                                wrapper.className = 'bot-content-wrapper';
-
-                                const header = document.createElement('div');
-                                header.className = 'bot-header';
-                                header.innerHTML = `<i class="bi bi-robot"></i>${senderUsername}`;
-                                wrapper.appendChild(header);
-
-                                const contentP = document.createElement('p');
-                                contentP.id = `bot-content-${requestId}`;
-                                contentP.textContent = content;
-                                wrapper.appendChild(contentP);
-
-                                const jumpContainer = document.createElement('div');
-                                jumpContainer.id = `bot-jump-${requestId}`;
-                                if (jumpId) {
-                                    const jumpBtn = document.createElement('button');
-                                    jumpBtn.className = 'jump-btn';
-                                    jumpBtn.textContent = 'Jump to message';
-                                    jumpBtn.dataset.jumpId = jumpId;
-                                    jumpContainer.appendChild(jumpBtn);
-                                }
-                                wrapper.appendChild(jumpContainer);
-
-                                bubble.appendChild(wrapper);
-                                return bubble;
-                            }
-
-                            // Search filter
-                            const searchInput = document.getElementById('contact-search-input');
-                            if (searchInput) {
-                                searchInput.addEventListener('input', function () {
-                                    const filter = this.value.toLowerCase();
-                                    const items = document.querySelectorAll('.contact-list .contact-item');
-
-                                    items.forEach(function (item) {
-                                        const name = item.querySelector('.contact-info h6')?.textContent.toLowerCase() || '';
-                                        const username = item.querySelector('.contact-info small')?.textContent.toLowerCase() || '';
-                                        const text = name + username;
-
-                                        item.style.display = text.includes(filter) ? 'flex' : 'none';
-                                    });
-                                });
-                            }
-
-                            // Dynamic Contact Requests
-                            document.querySelectorAll('.contact-requests .btn').forEach(btn => {
-                                btn.addEventListener('click', function (e) {
-                                    e.preventDefault();
-                                    const url = this.getAttribute('href');
-                                    const requestItem = this.closest('.request-item');
-
-                                    fetch(url, {
-                                        headers: {
-                                            'X-Requested-With': 'XMLHttpRequest'
-                                        }
-                                    })
-                                        .then(response => response.json())
-                                        .then(data => {
-                                            if (data.status === 'success') {
-                                                requestItem.remove();
-                                                // If accepting, reload to show new contact (or dynamically add it - simplified for now)
-                                                if (url.includes('accept')) {
-                                                    window.location.reload();
-                                                }
-                                                // Check if no more requests, hide section
-                                                if (document.querySelectorAll('.request-item').length === 0) {
-                                                    document.querySelector('.contact-requests').remove();
-                                                }
-                                            } else {
-                                                alert(data.message);
-                                            }
-                                        })
-                                        .catch(err => console.error('Error:', err));
-                                });
-                            });
-
-                            // Dynamic Group Creation
-                            const createGroupForm = document.getElementById('create-group-form');
-                            if (createGroupForm) {
-                                createGroupForm.addEventListener('submit', function (e) {
-                                    e.preventDefault();
-                                    const formData = new FormData(this);
-
-                                    fetch("{% url 'chatapp:create_group' %}", {
-                                        method: 'POST',
-                                        body: formData,
-                                        headers: {
-                                            'X-Requested-With': 'XMLHttpRequest'
-                                        }
-                                    })
-                                        .then(response => response.json())
-                                        .then(data => {
-                                            if (data.status === 'success') {
-                                                // Close modal
-                                                const modal = bootstrap.Modal.getInstance(document.getElementById('createGroupModal'));
-                                                modal.hide();
-                                                this.reset();
-                                                // Redirect to new group
-                                                window.location.href = `/dashboard/group/${data.group.id}/`;
-                                            } else {
-                                                alert('Error creating group: ' + JSON.stringify(data.errors));
-                                            }
-                                        })
-                                        .catch(err => console.error('Error:', err));
-                                });
-                            }
-                        });
-                    </script>
-                    {% endblock %}
+                fetch("{% url 'chatapp:create_group' %}", {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Close modal
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('createGroupModal'));
+                            modal.hide();
+                            this.reset();
+                            // Redirect to new group
+                            window.location.href = `/dashboard/group/${data.group.id}/`;
+                        } else {
+                            alert('Error creating group: ' + JSON.stringify(data.errors));
+                        }
+                    })
+                    .catch(err => console.error('Error:', err));
+            });
+        }
+    });
+</script>
+{% endblock %}

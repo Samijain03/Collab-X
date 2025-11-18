@@ -28,4 +28,7 @@ urlpatterns = [
     path('send-request/<int:user_id>/', views.send_contact_request_view, name='send_contact_request'),
     path('accept-request/<int:request_id>/', views.accept_contact_request_view, name='accept_contact_request'),
     path('decline-request/<int:request_id>/', views.decline_contact_request_view, name='decline_contact_request'),
+
+    # Attachments
+    path('chat/<str:chat_type>/<int:chat_id>/attachment/', views.upload_attachment_view, name='upload_attachment'),
 ]

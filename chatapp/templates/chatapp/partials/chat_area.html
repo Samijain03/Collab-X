@@ -1,0 +1,118 @@
+{% load static %}
+<div class="chat-area" id="chatArea">
+    <div class="loading-overlay d-none" id="chatLoadingIndicator">
+        <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    {% if selected_contact or selected_group %}
+        <div class="chat-header">
+            <div class="chat-header-info">
+                {% if selected_contact %}
+                    <a href="#" class="profile-pic-clickable">
+                        <img src="{{ selected_contact.profile_picture.url }}" alt="{{ selected_contact.display_name|default:selected_contact.user.username }}">
+                    </a>
+                    <div class="chat-header-text">
+                        <h6>{{ selected_contact.display_name|default:selected_contact.user.username }}</h6>
+                        <small>@{{ selected_contact.user.username }}</small>
+                    </div>
+                {% elif selected_group %}
+                    <div class="group-icon">{{ selected_group.name|first|upper }}</div>
+                    <div class="chat-header-text">
+                        <h6>{{ selected_group.name }}</h6>
+                        <small>{{ selected_group.members.count }} member{{ selected_group.members.count|pluralize }}</small>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if selected_group and selected_group.creator == user %}
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="border-color: var(--border-color); color: var(--text-secondary);">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+                    <li><a class="dropdown-item" href="{% url 'chatapp:edit_group' selected_group.id %}">
+                        <i class="bi bi-pencil me-2"></i>Change Name
+                    </a></li>
+                    <li><a class="dropdown-item" href="{% url 'chatapp:add_group_members' selected_group.id %}">
+                        <i class="bi bi-person-plus me-2"></i>Add Members
+                    </a></li>
+                    <li><a class="dropdown-item" href="{% url 'chatapp:remove_group_members' selected_group.id %}">
+                        <i class="bi bi-person-dash me-2"></i>Remove Members
+                    </a></li>
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            {% for message in messages %}
+            <div class="message-bubble {% if message.sender == user %}sent{% else %}received{% endif %}" data-message-id="{{ message.id }}">
+                {% if message.is_deleted %}
+                    <p class="fst-italic" style="opacity: 0.7;">This message was deleted.</p>
+                {% else %}
+                    {% if selected_group and message.sender != user %}
+                        <small class="fw-bold d-block mb-1" style="color: var(--primary-light);">{{ message.sender.profile.display_name|default:message.sender.username }}</small>
+                    {% endif %}
+                    {% if message.content %}
+                    <p>{{ message.content }}</p>
+                    {% endif %}
+                    {% if message.file %}
+                    <div class="attachment-card">
+                        <i class="bi bi-paperclip"></i>
+                        <div class="flex-grow-1">
+                            <strong>{{ message.file_name|default:"Attachment" }}</strong><br>
+                            <small class="text-muted">{{ message.file.size|filesizeformat }}</small>
+                        </div>
+                        <a class="btn btn-sm btn-outline-light" href="{{ message.file.url }}" download>
+                            <i class="bi bi-download me-1"></i>Download
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if message.sender == user %}
+                    <button class="btn btn-danger btn-sm delete-msg-btn float-end" title="Delete message">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                    {% endif %}
+                    {% if message.sender.profile.display_name %}
+                        <small class="text-muted d-block">{{ message.sender.profile.display_name }}</small>
+                    {% endif %}
+                {% endif %}
+                <span class="message-time">{{ message.timestamp|date:"h:i A" }}</span>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted my-4">
+                <i class="bi bi-chat-quote" style="font-size: 3rem; opacity: 0.3;"></i>
+                <p class="mt-2">Start the conversation</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="chat-input">
+            <form class="input-group align-items-center" id="chat-form" data-upload-url="{% if chat_type and chat_id %}{% url 'chatapp:upload_attachment' chat_type chat_id %}{% endif %}">
+                <button class="btn tool-btn me-2" type="button" id="emoji-btn" title="Emoji picker">
+                    <i class="bi bi-emoji-smile"></i>
+                </button>
+                <button class="btn tool-btn me-2" type="button" id="attachment-btn" title="Send attachment">
+                    <i class="bi bi-plus-circle"></i>
+                </button>
+                <input type="text" id="message-input" class="form-control" placeholder="Type a message... (Use /Collab for AI)" required>
+                <button class="btn btn-primary ms-2" type="submit">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </form>
+            <input type="file" id="attachment-input" class="d-none" accept=".py,.html,.txt,.md,.pdf,.png,.jpg,.jpeg,.gif,.zip,.rar,.7z,.json,.csv">
+            <small class="text-success d-none" id="attachment-status"></small>
+        </div>
+    {% else %}
+        <div class="placeholder-area">
+            <div>
+                <i class="bi bi-chat-heart-fill"></i>
+                <h3>Welcome to &lt;Collab-X/&gt;</h3>
+                <p>Select a contact or group to start messaging</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+

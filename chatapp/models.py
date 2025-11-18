@@ -31,9 +31,12 @@ class Message(models.Model):
     # ... (keep the Message model as it is) ...
     sender = models.ForeignKey(User, related_name="sent_messages", on_delete=models.CASCADE)
     receiver = models.ForeignKey(User, related_name="received_messages", on_delete=models.CASCADE)
-    content = models.TextField()
+    content = models.TextField(blank=True)
+    file = models.FileField(upload_to='chat_attachments/', blank=True, null=True)
+    file_name = models.CharField(max_length=255, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
+
     def __str__(self):
         return f"From {self.sender.username} to {self.receiver.username}"
 
@@ -68,7 +71,9 @@ class Group(models.Model):
 class GroupMessage(models.Model):
     group = models.ForeignKey(Group, related_name='messages', on_delete=models.CASCADE)
     sender = models.ForeignKey(User, related_name='group_messages', on_delete=models.CASCADE)
-    content = models.TextField()
+    content = models.TextField(blank=True)
+    file = models.FileField(upload_to='chat_attachments/', blank=True, null=True)
+    file_name = models.CharField(max_length=255, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
 
@@ -77,3 +82,50 @@ class GroupMessage(models.Model):
 
     def __str__(self):
         return f'{self.sender.username} in {self.group.name}: {self.content[:20]}'
+
+
+class WorkspaceNode(models.Model):
+    class NodeType(models.TextChoices):
+        FILE = 'file', 'File'
+        FOLDER = 'folder', 'Folder'
+
+    LANGUAGE_CHOICES = (
+        ('python', 'Python'),
+        ('html', 'HTML'),
+        ('javascript', 'JavaScript'),
+        ('css', 'CSS'),
+        ('text', 'Text'),
+        ('json', 'JSON'),
+        ('markdown', 'Markdown'),
+    )
+
+    workspace_key = models.CharField(max_length=64, db_index=True)
+    name = models.CharField(max_length=120)
+    node_type = models.CharField(max_length=12, choices=NodeType.choices)
+    language = models.CharField(max_length=20, choices=LANGUAGE_CHOICES, blank=True, null=True)
+    content = models.TextField(blank=True)
+    parent = models.ForeignKey('self', related_name='children', null=True, blank=True, on_delete=models.CASCADE)
+    position = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey(User, related_name='workspace_nodes', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('workspace_key', 'parent', 'name')
+        ordering = ['position', 'name']
+
+    def __str__(self):
+        return f'{self.workspace_key}::{self.full_path}'
+
+    @property
+    def is_file(self):
+        return self.node_type == self.NodeType.FILE
+
+    @property
+    def full_path(self):
+        parts = [self.name]
+        parent = self.parent
+        while parent:
+            parts.append(parent.name)
+            parent = parent.parent
+        return "/".join(reversed(parts))

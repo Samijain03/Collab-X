@@ -7,4 +7,5 @@ websocket_urlpatterns = [
     re_path(r'ws/chat/(?P<contact_id>\d+)/$', consumers.ChatConsumer.as_asgi()),
     # --- ADD THIS NEW LINE ---
     re_path(r'ws/group/(?P<group_id>\d+)/$', consumers.GroupChatConsumer.as_asgi()),
+    re_path(r'ws/workspace/(?P<workspace_key>[\w_]+)/$', consumers.WorkspaceConsumer.as_asgi()),
 ]

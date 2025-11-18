@@ -15,7 +15,7 @@ from .forms import (
     SignUpForm, ProfileUpdateForm, CreateGroupForm,
     ChangeGroupNameForm, AddGroupMemberForm, RemoveGroupMemberForm
 )
-from .models import ContactRequest, Profile, Message, Group, GroupMessage
+from .models import ContactRequest, Profile, Message, Group, GroupMessage , ProjectFile
 
 
 # Homepage View

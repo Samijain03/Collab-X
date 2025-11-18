@@ -165,39 +165,71 @@ def search_users_view(request):
 
 @login_required
 def send_contact_request_view(request, user_id):
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     try:
         user_to_request = User.objects.get(id=user_id)
         if request.user.profile.contacts.filter(user=user_to_request).exists():
-             messages.info(request, f'You are already contacts with {user_to_request.username}.')
+             msg = f'You are already contacts with {user_to_request.username}.'
+             if is_ajax: return JsonResponse({'status': 'info', 'message': msg})
+             messages.info(request, msg)
         elif ContactRequest.objects.filter(from_user=request.user, to_user=user_to_request).exists():
-            messages.info(request, 'You have already sent a request to this user.')
+            msg = 'You have already sent a request to this user.'
+            if is_ajax: return JsonResponse({'status': 'info', 'message': msg})
+            messages.info(request, msg)
         else:
             ContactRequest.objects.create(from_user=request.user, to_user=user_to_request)
-            messages.success(request, f'Contact request sent to {user_to_request.username}!')
+            msg = f'Contact request sent to {user_to_request.username}!'
+            if is_ajax: return JsonResponse({'status': 'success', 'message': msg})
+            messages.success(request, msg)
     except User.DoesNotExist:
-        messages.error(request, 'User not found.')
+        msg = 'User not found.'
+        if is_ajax: return JsonResponse({'status': 'error', 'message': msg}, status=404)
+        messages.error(request, msg)
+    
+    if is_ajax: return JsonResponse({'status': 'error', 'message': 'Unknown error'})
     return redirect('chatapp:search_users')
 
 @login_required
 def accept_contact_request_view(request, request_id):
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     try:
         contact_request = ContactRequest.objects.get(id=request_id, to_user=request.user)
         request.user.profile.contacts.add(contact_request.from_user.profile)
         contact_request.from_user.profile.contacts.add(request.user.profile)
         contact_request.delete()
-        messages.success(request, f'You are now contacts with {contact_request.from_user.username}!')
+        msg = f'You are now contacts with {contact_request.from_user.username}!'
+        
+        if is_ajax:
+            return JsonResponse({
+                'status': 'success', 
+                'message': msg,
+                'new_contact': {
+                    'id': contact_request.from_user.id,
+                    'username': contact_request.from_user.username,
+                    'display_name': contact_request.from_user.profile.display_name or contact_request.from_user.username,
+                    'profile_picture_url': contact_request.from_user.profile.profile_picture.url
+                }
+            })
+        messages.success(request, msg)
     except ContactRequest.DoesNotExist:
-        messages.error(request, 'Contact request not found or invalid.')
+        msg = 'Contact request not found or invalid.'
+        if is_ajax: return JsonResponse({'status': 'error', 'message': msg}, status=404)
+        messages.error(request, msg)
     return redirect('chatapp:dashboard')
 
 @login_required
 def decline_contact_request_view(request, request_id):
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     try:
         contact_request = ContactRequest.objects.get(id=request_id, to_user=request.user)
         contact_request.delete()
-        messages.info(request, 'Contact request declined.')
+        msg = 'Contact request declined.'
+        if is_ajax: return JsonResponse({'status': 'success', 'message': msg})
+        messages.info(request, msg)
     except ContactRequest.DoesNotExist:
-        messages.error(request, 'Contact request not found or invalid.')
+        msg = 'Contact request not found or invalid.'
+        if is_ajax: return JsonResponse({'status': 'error', 'message': msg}, status=404)
+        messages.error(request, msg)
     return redirect('chatapp:dashboard')
 
 @login_required
@@ -217,6 +249,8 @@ def settings_view(request):
 
 @login_required
 def create_group_view(request):
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    
     if request.method == 'POST':
         # Pass the request.user to the form
         form = CreateGroupForm(request.POST, user=request.user)
@@ -232,9 +266,25 @@ def create_group_view(request):
             # CRITICAL: Add the creator to the group as well!
             new_group.members.add(request.user)
             
-            messages.success(request, f"Group '{name}' created successfully!")
+            msg = f"Group '{name}' created successfully!"
+            
+            if is_ajax:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': msg,
+                    'group': {
+                        'id': new_group.id,
+                        'name': new_group.name,
+                        'member_count': new_group.members.count()
+                    }
+                })
+            
+            messages.success(request, msg)
             # Redirect to the new group's chat page
             return redirect('chatapp:dashboard_group_chat', group_id=new_group.id)
+        elif is_ajax:
+             return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+             
     else:
         # Pass the request.user to the form
         form = CreateGroupForm(user=request.user)

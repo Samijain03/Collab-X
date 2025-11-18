@@ -2,7 +2,7 @@
 
 import json
 import re
-import time # <-- ADD THIS
+import time
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
@@ -10,6 +10,7 @@ from django.db.models import Q
 
 from .models import Message, Profile, Group, GroupMessage
 from .gemini_utils import format_chat_history, get_collab_response
+from .code_executor import execute_python_code
 
 def parse_bot_response(response_text):
     """
@@ -30,7 +31,6 @@ def parse_bot_response(response_text):
 
 class ChatConsumer(AsyncWebsocketConsumer):
     
-    # ... connect ...
     async def connect(self):
         try:
             self.user = self.scope['user']
@@ -63,7 +63,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
         await self.accept()
 
-    # ... disconnect ...
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(
@@ -71,7 +70,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
 
-    # --- UPDATED `receive` METHOD ---
     async def receive(self, text_data):
         data = json.loads(text_data)
         message_type = data.get('type', 'chat_message') 
@@ -81,12 +79,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if not message_content.strip():
                 return 
 
-            # --- UPDATED BOT CHECK ---
             if message_content.startswith('/Collab'):
                 is_hidden = message_content.startswith('/Collab hidden')
                 await self.handle_collab_command(message_content, is_hidden)
                 return
-            # --- END BOT CHECK ---
 
             new_message = await self.save_message(
                 sender=self.user,
@@ -117,7 +113,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     }
                 )
 
-    # ... chat_message (unchanged) ...
+        elif message_type == 'execute_code':
+            code = data.get('code', '')
+            if code:
+                result = await database_sync_to_async(execute_python_code)(code)
+                await self.send(text_data=json.dumps({
+                    'type': 'execution_result',
+                    'output': result
+                }))
+
     async def chat_message(self, event):
         await self.send(text_data=json.dumps({
             'type': 'chat_message', 
@@ -127,19 +131,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'timestamp': event['timestamp'],
         }))
 
-    # ... message_deleted (unchanged) ...
     async def message_deleted(self, event):
         await self.send(text_data=json.dumps({
             'type': 'message_deleted',
             'message_id': event['message_id'],
         }))
 
-    # --- NEW `handle_collab_command` ---
     async def handle_collab_command(self, command_text, is_hidden):
-        # Generate a unique ID for this request
         request_id = f"bot-{self.user.id}-{int(time.time())}"
         
-        # 1. Send "Thinking..." message
         thinking_payload_js = {
             'type': 'bot_message',
             'status': 'thinking',
@@ -150,12 +150,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }
         
         if is_hidden:
-            # Send "Thinking..." only to the user
             await self.send(text_data=json.dumps(thinking_payload_js))
         else:
-            # Broadcast "Thinking..." to the group
             await self.channel_layer.group_send(self.room_group_name, {
-                'type': 'bot_message', # This is the handler name
+                'type': 'bot_message',
                 'status': 'thinking',
                 'message': "Thinking...",
                 'sender_username': 'Collab-X',
@@ -163,7 +161,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'request_id': request_id
             })
         
-        # 2. Extract user's actual query
         if is_hidden:
             user_query = command_text.replace('/Collab hidden', '').strip()
         else:
@@ -171,33 +168,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not user_query:
             user_query = "Summarize our chat so far."
             
-        # 3. Get chat history
         chat_history_string = await self.get_chat_history()
         
-        # 4. Call Gemini (wrapped)
         bot_response_text = await database_sync_to_async(get_collab_response)(
             chat_history_string, 
             user_query
         )
         clean_content, jump_id = parse_bot_response(bot_response_text)
         
-        # 5. Send the final response
         final_payload_js = {
             'type': 'bot_message',
             'status': 'complete',
             'content': clean_content,
             'sender_username': 'Collab-X',
             'jump_id': jump_id,
-            'request_id': request_id # Use same ID
+            'request_id': request_id
         }
 
         if is_hidden:
-            # Send final response only to the user
             await self.send(text_data=json.dumps(final_payload_js))
         else:
-            # Broadcast final response to the group
             await self.channel_layer.group_send(self.room_group_name, {
-                'type': 'bot_message', # Handler name
+                'type': 'bot_message',
                 'status': 'complete',
                 'message': clean_content,
                 'sender_username': 'Collab-X',
@@ -205,19 +197,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'request_id': request_id
             })
 
-    # --- UPDATED `bot_message` HANDLER ---
     async def bot_message(self, event):
-        """ Handles broadcasting 'bot_message' types from the group. """
         await self.send(text_data=json.dumps({
-            'type': 'bot_message', # Type for JS client
+            'type': 'bot_message',
             'status': event.get('status', 'complete'),
-            'content': event['message'], # Content is in 'message'
+            'content': event['message'],
             'sender_username': event['sender_username'],
             'jump_id': event.get('jump_id', None),
             'request_id': event.get('request_id')
         }))
         
-    # ... get_chat_history (unchanged) ...
     @database_sync_to_async
     def get_chat_history(self):
         messages_queryset = Message.objects.filter(
@@ -227,7 +216,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ).order_by('timestamp')
         return format_chat_history(messages_queryset)
 
-    # ... Other DB helpers (get_user, get_profile, etc. are unchanged) ...
     @database_sync_to_async
     def get_user(self, user_id):
         return User.objects.get(id=user_id)
@@ -254,11 +242,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return None
 
 
-# --- UPDATES FOR GroupChatConsumer ---
-
 class GroupChatConsumer(AsyncWebsocketConsumer):
     
-    # ... connect (unchanged) ...
     async def connect(self):
         try:
             self.user = self.scope['user']
@@ -285,7 +270,6 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
         )
         await self.accept()
 
-    # ... disconnect (unchanged) ...
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(
@@ -293,7 +277,6 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
 
-    # --- UPDATED `receive` METHOD ---
     async def receive(self, text_data):
         data = json.loads(text_data)
         message_type = data.get('type', 'chat_message')
@@ -303,12 +286,10 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             if not message_content.strip():
                 return
             
-            # --- UPDATED BOT CHECK ---
             if message_content.startswith('/Collab'):
                 is_hidden = message_content.startswith('/Collab hidden')
                 await self.handle_collab_command(message_content, is_hidden)
                 return
-            # --- END BOT CHECK ---
 
             new_message = await self.save_group_message(
                 group=self.group,
@@ -339,7 +320,15 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
                     }
                 )
 
-    # ... group_chat_message (unchanged) ...
+        elif message_type == 'execute_code':
+            code = data.get('code', '')
+            if code:
+                result = await database_sync_to_async(execute_python_code)(code)
+                await self.send(text_data=json.dumps({
+                    'type': 'execution_result',
+                    'output': result
+                }))
+
     async def group_chat_message(self, event):
         await self.send(text_data=json.dumps({
             'type': 'chat_message', 
@@ -349,14 +338,12 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             'timestamp': event['timestamp'],
         }))
         
-    # ... message_deleted (unchanged) ...
     async def message_deleted(self, event):
         await self.send(text_data=json.dumps({
             'type': 'message_deleted',
             'message_id': event['message_id'],
         }))
 
-    # --- NEW `handle_collab_command` ---
     async def handle_collab_command(self, command_text, is_hidden):
         request_id = f"bot-{self.user.id}-{int(time.time())}"
         
@@ -417,7 +404,6 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
                 'request_id': request_id
             })
 
-    # --- UPDATED `bot_message` HANDLER ---
     async def bot_message(self, event):
         await self.send(text_data=json.dumps({
             'type': 'bot_message',
@@ -428,13 +414,11 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             'request_id': event.get('request_id')
         }))
         
-    # ... get_chat_history (unchanged) ...
     @database_sync_to_async
     def get_chat_history(self):
         messages_queryset = self.group.messages.filter(is_deleted=False).order_by('timestamp')
         return format_chat_history(messages_queryset)
 
-    # ... Other DB helpers (get_group, etc. are unchanged) ...
     @database_sync_to_async
     def get_group(self, group_id):
         return Group.objects.get(id=group_id)

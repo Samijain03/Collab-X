@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.template.loader import render_to_string
 # --- UPDATED IMPORTS ---
 from .forms import (
     SignUpForm, ProfileUpdateForm, CreateGroupForm,
@@ -135,6 +136,17 @@ def dashboard_view(request, contact_id=None, group_id=None):
         request.user.id,
         context.get('chat_id')
     )
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        chat_html = render_to_string('chatapp/partials/chat_area.html', context, request=request)
+        workspace_html = render_to_string('chatapp/partials/workspace_panel.html', context, request=request)
+        return JsonResponse({
+            'chat_html': chat_html,
+            'workspace_html': workspace_html,
+            'chat_type': context.get('chat_type'),
+            'chat_id': context.get('chat_id'),
+            'workspace_key': context.get('workspace_key'),
+        })
 
     return render(request, 'chatapp/dashboard.html', context)
 # --- End of Replaced View ---

@@ -129,11 +129,17 @@ def dashboard_view(request, contact_id=None, group_id=None):
             if selected_group in user_groups:
                 context['selected_group'] = selected_group
                 # Optimize: Use select_related for sender, limit to last 100 messages
+                # Force evaluation and ensure profile is loaded
                 group_messages = selected_group.messages.select_related(
                     'sender', 'sender__profile'
                 ).order_by('-timestamp')[:100]
-                # Reverse to show oldest first
-                context['messages'] = list(reversed(group_messages))
+                # Convert to list and ensure profile is accessed to trigger loading
+                messages_list = []
+                for msg in reversed(group_messages):
+                    # Force profile access to ensure it's loaded
+                    _ = msg.sender.profile.display_name if hasattr(msg.sender, 'profile') else None
+                    messages_list.append(msg)
+                context['messages'] = messages_list
                 context['chat_type'] = 'group'
                 context['chat_id'] = selected_group.id
             else:
@@ -391,6 +397,23 @@ def remove_group_members_view(request, group_id):
     'button_text': 'Remove Members'
     }
     return render(request, 'chatapp/edit_group.html', context)
+
+
+@login_required
+@require_POST
+def delete_group_view(request, group_id):
+    """Delete a group. Only the creator can delete it."""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Only creator can delete
+    if group.creator != request.user:
+        messages.error(request, "You do not have permission to delete this group.")
+        return redirect('chatapp:dashboard')
+    
+    group_name = group.name
+    group.delete()
+    messages.success(request, f"Group '{group_name}' has been deleted.")
+    return redirect('chatapp:dashboard')
 
 
 @login_required

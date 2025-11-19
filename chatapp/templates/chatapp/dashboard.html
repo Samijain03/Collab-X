@@ -1219,8 +1219,13 @@
                 <p class="fst-italic" style="opacity: 0.7;">This message was deleted.</p>
                 {% else %}
                 {% if selected_group and message.sender != user %}
-                <small class="fw-bold d-block mb-1" style="color: var(--primary-light);">{{
-                    message.sender.profile.display_name|default:message.sender.username }}</small>
+                <small class="fw-bold d-block mb-1" style="color: var(--primary-light);">
+                    {% if message.sender.profile.display_name %}
+                        {{ message.sender.profile.display_name }}
+                    {% else %}
+                        {{ message.sender.username }}
+                    {% endif %}
+                </small>
                 {% endif %}
                 <p>{{ message.content }}</p>
                 {% if message.sender == user %}

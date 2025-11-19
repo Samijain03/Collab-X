@@ -568,6 +568,20 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
             if node_id:
                 await self.delete_node(node_id)
                 await self.broadcast_file_list()
+        
+        elif message_type == 'execute_code':
+            node_id = data.get('node_id')
+            code = data.get('code', '')
+            language = data.get('language', 'python')
+            
+            if code and node_id:
+                result = await database_sync_to_async(execute_python_code)(code)
+                await self.send(text_data=json.dumps({
+                    'type': 'execution_result',
+                    'node_id': node_id,
+                    'output': result,
+                    'language': language
+                }))
 
     async def file_updated(self, event):
         # Don't echo back to the sender to avoid cursor jumps/conflicts
@@ -638,6 +652,7 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
 
     async def broadcast_file_list(self):
         files = await self.get_files()
+        # Send to all clients in the workspace
         await self.channel_layer.group_send(
             self.room_group_name,
             {

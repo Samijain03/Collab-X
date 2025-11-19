@@ -613,6 +613,13 @@
         const wsUrl = `${wsProtocol}//${window.location.host}/ws/workspace/${workspaceKey}/`;
         state.workspaceSocket = new WebSocket(wsUrl);
 
+        state.workspaceSocket.onopen = () => {
+            // Request file list when connected
+            state.workspaceSocket.send(JSON.stringify({
+                type: 'list_files'
+            }));
+        };
+
         state.workspaceSocket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'workspace_bootstrap') {
@@ -635,20 +642,42 @@
             } else if (data.type === 'file_list') {
                 // Handle file list updates
                 state.workspaceNodes = new Map();
-                data.files.forEach(node => state.workspaceNodes.set(node.id, node));
+                data.files.forEach(node => {
+                    // Ensure content is initialized
+                    if (!node.content) node.content = '';
+                    state.workspaceNodes.set(node.id, node);
+                });
                 state.workspaceTree = buildWorkspaceTree(Array.from(state.workspaceNodes.values()));
                 renderWorkspaceTree();
             } else if (data.type === 'file_content') {
                 // Handle file content response
-                if (data.node_id === state.activeWorkspaceNode) {
-                    const { workspaceEditor } = state.workspaceUI || {};
-                    if (workspaceEditor) {
-                        state.workspaceIsApplyingRemote = true;
-                        workspaceEditor.value = data.content;
-                        state.workspaceContent = data.content;
-                        state.workspaceLastContent = data.content;
-                        state.workspaceIsApplyingRemote = false;
+                const nodeId = data.node_id;
+                if (nodeId) {
+                    // Update node content in our map
+                    const node = state.workspaceNodes.get(nodeId);
+                    if (node) {
+                        node.content = data.content;
                     }
+                    
+                    // If this is the active file, update editor
+                    if (nodeId === state.activeWorkspaceNode) {
+                        const { workspaceEditor } = state.workspaceUI || {};
+                        if (workspaceEditor) {
+                            state.workspaceIsApplyingRemote = true;
+                            workspaceEditor.value = data.content;
+                            state.workspaceContent = data.content;
+                            state.workspaceLastContent = data.content;
+                            state.workspaceIsApplyingRemote = false;
+                        }
+                    }
+                }
+            } else if (data.type === 'execution_result') {
+                // Handle code execution result
+                const { workspaceConsole, workspaceOutputMeta } = state.workspaceUI || {};
+                if (workspaceConsole && workspaceOutputMeta) {
+                    const output = data.output || '(no output)';
+                    workspaceConsole.textContent = output;
+                    workspaceOutputMeta.textContent = `${(data.language || 'python').toUpperCase()} • Execution Result`;
                 }
             }
         };
@@ -682,11 +711,12 @@
         workspaceNewFileBtn?.addEventListener('click', () => {
             const name = prompt('Enter file name (e.g., main.py, index.html):', 'main.py');
             if (name && state.workspaceSocket) {
-                const path = name.trim();
+                const fileName = name.trim();
                 state.workspaceSocket.send(JSON.stringify({
-                    action: 'create_entry',
-                    path: path,
-                    node_type: 'file'
+                    type: 'create_node',
+                    name: fileName,
+                    node_type: 'file',
+                    parent_id: null
                 }));
             }
         });
@@ -695,11 +725,12 @@
         workspaceNewFolderBtn?.addEventListener('click', () => {
             const name = prompt('Enter folder name:', 'new-folder');
             if (name && state.workspaceSocket) {
-                const path = name.trim();
+                const folderName = name.trim();
                 state.workspaceSocket.send(JSON.stringify({
-                    action: 'create_entry',
-                    path: path,
-                    node_type: 'folder'
+                    type: 'create_node',
+                    name: folderName,
+                    node_type: 'folder',
+                    parent_id: null
                 }));
             }
         });
@@ -712,15 +743,17 @@
             const paths = input.split('\n').map(p => p.trim()).filter(p => p);
             if (paths.length === 0) return;
 
-            const entries = paths.map(path => ({
-                path: path,
-                node_type: path.endsWith('/') ? 'folder' : 'file'
-            }));
-
-            state.workspaceSocket.send(JSON.stringify({
-                action: 'create_batch',
-                entries: entries
-            }));
+            // Create files/folders one by one (backend doesn't support batch yet)
+            paths.forEach(path => {
+                const isFolder = path.endsWith('/');
+                const name = isFolder ? path.slice(0, -1) : path;
+                state.workspaceSocket.send(JSON.stringify({
+                    type: 'create_node',
+                    name: name,
+                    node_type: isFolder ? 'folder' : 'file',
+                    parent_id: null
+                }));
+            });
         });
 
         // Legacy create buttons (for backward compatibility)
@@ -731,10 +764,10 @@
                 const name = prompt(`Name your ${language.toUpperCase()} file:`, defaultName);
                 if (name && state.workspaceSocket) {
                     state.workspaceSocket.send(JSON.stringify({
-                        action: 'create_entry',
-                        path: name.trim(),
+                        type: 'create_node',
+                        name: name.trim(),
                         node_type: 'file',
-                        language: language
+                        parent_id: null
                     }));
                 }
             });
@@ -763,7 +796,7 @@
                 : 'Delete this file for everyone?';
             if (confirm(confirmMsg)) {
                 state.workspaceSocket.send(JSON.stringify({
-                    action: 'delete_node',
+                    type: 'delete_node',
                     node_id: state.activeWorkspaceNode
                 }));
             }
@@ -836,9 +869,18 @@
             if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
             const node = state.workspaceNodes.get(state.activeWorkspaceNode);
             if (!node || node.node_type !== 'file') return;
+            const { workspaceEditor } = state.workspaceUI || {};
+            if (!workspaceEditor) return;
+            
+            const code = workspaceEditor.value;
+            const language = node.language || 'python';
+            
+            // Execute code via workspace socket
             state.workspaceSocket.send(JSON.stringify({
-                action: 'run_file',
-                node_id: state.activeWorkspaceNode
+                type: 'execute_code',
+                node_id: state.activeWorkspaceNode,
+                code: code,
+                language: language
             }));
         });
 
@@ -914,8 +956,14 @@
             if (btn) btn.disabled = false;
         });
 
-        // Notify others that we're viewing this file
+        // Request file content from server
         if (state.workspaceSocket) {
+            state.workspaceSocket.send(JSON.stringify({
+                type: 'read_file',
+                node_id: nodeId
+            }));
+            
+            // Notify others that we're viewing this file
             state.workspaceSocket.send(JSON.stringify({
                 type: 'file_focus',
                 node_id: nodeId

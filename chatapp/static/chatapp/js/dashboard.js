@@ -554,10 +554,13 @@
         const stored = localStorage.getItem(storageKey) === 'true';
         if (stored) applyState(true);
 
-        toggleBtn.addEventListener('click', () => {
-            const collapsed = !workspacePanel.classList.contains('collapsed');
-            applyState(collapsed);
-            localStorage.setItem(storageKey, collapsed ? 'true' : 'false');
+        toggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const isCurrentlyCollapsed = workspacePanel.classList.contains('collapsed');
+            const newState = !isCurrentlyCollapsed;
+            applyState(newState);
+            localStorage.setItem(storageKey, newState ? 'true' : 'false');
         });
     }
 
@@ -683,178 +686,210 @@
         };
 
         // Tree click handlers
-        workspaceTree?.addEventListener('click', (event) => {
-            const nodeEl = event.target.closest('.workspace-tree-node');
-            if (!nodeEl) return;
+        if (workspaceTree) {
+            workspaceTree.addEventListener('click', (event) => {
+                // Don't trigger if clicking on buttons
+                if (event.target.closest('.workspace-tree-actions')) return;
+                
+                const nodeEl = event.target.closest('.workspace-tree-node');
+                if (!nodeEl) return;
 
-            const nodeId = Number(nodeEl.dataset.nodeId);
-            const node = state.workspaceNodes.get(nodeId);
-            if (!node) return;
+                const nodeId = Number(nodeEl.dataset.nodeId);
+                const node = state.workspaceNodes.get(nodeId);
+                if (!node) return;
 
-            if (node.node_type === 'folder') {
-                // Toggle expand/collapse
-                if (state.expandedFolders.has(nodeId)) {
-                    state.expandedFolders.delete(nodeId);
+                if (node.node_type === 'folder') {
+                    // Toggle expand/collapse
+                    if (state.expandedFolders.has(nodeId)) {
+                        state.expandedFolders.delete(nodeId);
+                    } else {
+                        state.expandedFolders.add(nodeId);
+                    }
+                    const workspaceKey = elements.workspaceKey;
+                    localStorage.setItem(`workspace_expanded_${workspaceKey}`, JSON.stringify(Array.from(state.expandedFolders)));
+                    renderWorkspaceTree();
                 } else {
-                    state.expandedFolders.add(nodeId);
+                    // Select file
+                    setActiveWorkspaceNode(nodeId);
                 }
-                const workspaceKey = elements.workspaceKey;
-                localStorage.setItem(`workspace_expanded_${workspaceKey}`, JSON.stringify(Array.from(state.expandedFolders)));
-                renderWorkspaceTree();
-            } else {
-                // Select file
-                setActiveWorkspaceNode(nodeId);
-            }
-        });
+            });
+        }
 
         // New file button
-        workspaceNewFileBtn?.addEventListener('click', () => {
-            const name = prompt('Enter file name (e.g., main.py, index.html):', 'main.py');
-            if (name && state.workspaceSocket) {
-                const fileName = name.trim();
-                state.workspaceSocket.send(JSON.stringify({
-                    type: 'create_node',
-                    name: fileName,
-                    node_type: 'file',
-                    parent_id: null
-                }));
-            }
-        });
-
-        // New folder button
-        workspaceNewFolderBtn?.addEventListener('click', () => {
-            const name = prompt('Enter folder name:', 'new-folder');
-            if (name && state.workspaceSocket) {
-                const folderName = name.trim();
-                state.workspaceSocket.send(JSON.stringify({
-                    type: 'create_node',
-                    name: folderName,
-                    node_type: 'folder',
-                    parent_id: null
-                }));
-            }
-        });
-
-        // Batch create button
-        workspaceBatchBtn?.addEventListener('click', () => {
-            const input = prompt('Enter file paths (one per line):\nExample:\nbackend/app.py\nfrontend/index.html\nutils/helper.js');
-            if (!input || !state.workspaceSocket) return;
-
-            const paths = input.split('\n').map(p => p.trim()).filter(p => p);
-            if (paths.length === 0) return;
-
-            // Create files/folders one by one (backend doesn't support batch yet)
-            paths.forEach(path => {
-                const isFolder = path.endsWith('/');
-                const name = isFolder ? path.slice(0, -1) : path;
-                state.workspaceSocket.send(JSON.stringify({
-                    type: 'create_node',
-                    name: name,
-                    node_type: isFolder ? 'folder' : 'file',
-                    parent_id: null
-                }));
-            });
-        });
-
-        // Legacy create buttons (for backward compatibility)
-        workspaceCreateButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const language = btn.dataset.workspaceCreate;
-                const defaultName = language === 'python' ? 'main.py' : 'index.html';
-                const name = prompt(`Name your ${language.toUpperCase()} file:`, defaultName);
-                if (name && state.workspaceSocket) {
+        if (workspaceNewFileBtn) {
+            workspaceNewFileBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const name = prompt('Enter file name (e.g., main.py, index.html):', 'main.py');
+                if (name && name.trim() && state.workspaceSocket) {
+                    const fileName = name.trim();
                     state.workspaceSocket.send(JSON.stringify({
                         type: 'create_node',
-                        name: name.trim(),
+                        name: fileName,
                         node_type: 'file',
                         parent_id: null
                     }));
                 }
             });
-        });
+        }
 
-        workspaceRenameBtn?.addEventListener('click', () => {
-            if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
-            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
-            if (!node) return;
-            const newName = prompt('Rename', node.name);
-            if (newName && newName.trim() !== node.name) {
-                state.workspaceSocket.send(JSON.stringify({
-                    action: 'rename_node',
-                    node_id: state.activeWorkspaceNode,
-                    name: newName.trim()
-                }));
-            }
-        });
+        // New folder button
+        if (workspaceNewFolderBtn) {
+            workspaceNewFolderBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const name = prompt('Enter folder name:', 'new-folder');
+                if (name && name.trim() && state.workspaceSocket) {
+                    const folderName = name.trim();
+                    state.workspaceSocket.send(JSON.stringify({
+                        type: 'create_node',
+                        name: folderName,
+                        node_type: 'folder',
+                        parent_id: null
+                    }));
+                }
+            });
+        }
 
-        workspaceDeleteBtn?.addEventListener('click', () => {
-            if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
-            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
-            if (!node) return;
-            const confirmMsg = node.node_type === 'folder' 
-                ? 'Delete this folder and all its contents for everyone?'
-                : 'Delete this file for everyone?';
-            if (confirm(confirmMsg)) {
-                state.workspaceSocket.send(JSON.stringify({
-                    type: 'delete_node',
-                    node_id: state.activeWorkspaceNode
-                }));
-            }
-        });
+        // Batch create button
+        if (workspaceBatchBtn) {
+            workspaceBatchBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const input = prompt('Enter file paths (one per line):\nExample:\nbackend/app.py\nfrontend/index.html\nutils/helper.js');
+                if (!input || !state.workspaceSocket) return;
+
+                const paths = input.split('\n').map(p => p.trim()).filter(p => p);
+                if (paths.length === 0) return;
+
+                // Create files/folders one by one (backend doesn't support batch yet)
+                paths.forEach(path => {
+                    const isFolder = path.endsWith('/');
+                    const name = isFolder ? path.slice(0, -1) : path;
+                    if (name) {
+                        state.workspaceSocket.send(JSON.stringify({
+                            type: 'create_node',
+                            name: name,
+                            node_type: isFolder ? 'folder' : 'file',
+                            parent_id: null
+                        }));
+                    }
+                });
+            });
+        }
+
+        // Legacy create buttons (for backward compatibility)
+        if (workspaceCreateButtons && workspaceCreateButtons.length > 0) {
+            workspaceCreateButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (btn.disabled) return;
+                    const language = btn.dataset.workspaceCreate;
+                    const defaultName = language === 'python' ? 'main.py' : 'index.html';
+                    const name = prompt(`Name your ${language.toUpperCase()} file:`, defaultName);
+                    if (name && name.trim() && state.workspaceSocket) {
+                        state.workspaceSocket.send(JSON.stringify({
+                            type: 'create_node',
+                            name: name.trim(),
+                            node_type: 'file',
+                            parent_id: null
+                        }));
+                    }
+                });
+            });
+        }
+
+        if (workspaceRenameBtn) {
+            workspaceRenameBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!state.activeWorkspaceNode || !state.workspaceSocket || workspaceRenameBtn.disabled) return;
+                const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+                if (!node) return;
+                const newName = prompt('Rename', node.name);
+                if (newName && newName.trim() !== node.name) {
+                    // Note: Rename functionality needs to be implemented in backend
+                    alert('Rename functionality coming soon!');
+                }
+            });
+        }
+
+        if (workspaceDeleteBtn) {
+            workspaceDeleteBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!state.activeWorkspaceNode || !state.workspaceSocket || workspaceDeleteBtn.disabled) return;
+                const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+                if (!node) return;
+                const confirmMsg = node.node_type === 'folder' 
+                    ? 'Delete this folder and all its contents for everyone?'
+                    : 'Delete this file for everyone?';
+                if (confirm(confirmMsg)) {
+                    state.workspaceSocket.send(JSON.stringify({
+                        type: 'delete_node',
+                        node_id: state.activeWorkspaceNode
+                    }));
+                }
+            });
+        }
 
         // Enhanced input handler with incremental updates
-        workspaceEditor?.addEventListener('input', (e) => {
-            if (!state.activeWorkspaceNode || !state.workspaceSocket || state.workspaceIsApplyingRemote) return;
-            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
-            if (!node || node.node_type !== 'file') return;
+        if (workspaceEditor) {
+            workspaceEditor.addEventListener('input', (e) => {
+                if (!state.activeWorkspaceNode || !state.workspaceSocket || state.workspaceIsApplyingRemote) return;
+                if (workspaceEditor.disabled) return;
+                const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+                if (!node || node.node_type !== 'file') return;
+                
+                const newContent = workspaceEditor.value;
+                const oldContent = state.workspaceContent;
+                const cursorPos = workspaceEditor.selectionStart;
+                
+                // Calculate delta (incremental change)
+                const delta = calculateDelta(oldContent, newContent, cursorPos);
+                
+                if (delta) {
+                    // Send incremental update
+                    state.workspaceSocket.send(JSON.stringify({
+                        type: 'write_file',
+                        node_id: state.activeWorkspaceNode,
+                        delta: delta,
+                        cursor_position: cursorPos
+                    }));
+                }
+                
+                // Update local state
+                state.workspaceContent = newContent;
+                state.workspaceLastContent = newContent;
+                
+                // Update cursor position (throttled)
+                if (state.workspaceCursorUpdateTimer) {
+                    clearTimeout(state.workspaceCursorUpdateTimer);
+                }
+                state.workspaceCursorUpdateTimer = setTimeout(() => {
+                    sendCursorUpdate();
+                }, 100);
+            });
             
-            const newContent = workspaceEditor.value;
-            const oldContent = state.workspaceContent;
-            const cursorPos = workspaceEditor.selectionStart;
-            
-            // Calculate delta (incremental change)
-            const delta = calculateDelta(oldContent, newContent, cursorPos);
-            
-            if (delta) {
-                // Send incremental update
-                state.workspaceSocket.send(JSON.stringify({
-                    type: 'write_file',
-                    node_id: state.activeWorkspaceNode,
-                    delta: delta,
-                    cursor_position: cursorPos
-                }));
-            }
-            
-            // Update local state
-            state.workspaceContent = newContent;
-            state.workspaceLastContent = newContent;
-            
-            // Update cursor position (throttled)
-            if (state.workspaceCursorUpdateTimer) {
-                clearTimeout(state.workspaceCursorUpdateTimer);
-            }
-            state.workspaceCursorUpdateTimer = setTimeout(() => {
+            // Track cursor movements
+            workspaceEditor.addEventListener('keyup', () => {
                 sendCursorUpdate();
-            }, 100);
-        });
-        
-        // Track cursor movements
-        workspaceEditor?.addEventListener('selectionchange', () => {
-            sendCursorUpdate();
-        });
-        
-        workspaceEditor?.addEventListener('keyup', () => {
-            sendCursorUpdate();
-        });
-        
-        workspaceEditor?.addEventListener('click', () => {
-            sendCursorUpdate();
-        });
+            });
+            
+            workspaceEditor.addEventListener('click', () => {
+                sendCursorUpdate();
+            });
+            
+            workspaceEditor.addEventListener('keydown', () => {
+                sendCursorUpdate();
+            });
+        }
         
         function sendCursorUpdate() {
             if (!state.activeWorkspaceNode || !state.workspaceSocket || state.workspaceIsApplyingRemote) return;
             const { workspaceEditor } = state.workspaceUI || {};
-            if (!workspaceEditor) return;
+            if (!workspaceEditor || workspaceEditor.disabled) return;
             
             state.workspaceSocket.send(JSON.stringify({
                 type: 'cursor_update',
@@ -865,39 +900,49 @@
             }));
         }
 
-        workspaceRunBtn?.addEventListener('click', () => {
-            if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
-            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
-            if (!node || node.node_type !== 'file') return;
-            const { workspaceEditor } = state.workspaceUI || {};
-            if (!workspaceEditor) return;
-            
-            const code = workspaceEditor.value;
-            const language = node.language || 'python';
-            
-            // Execute code via workspace socket
-            state.workspaceSocket.send(JSON.stringify({
-                type: 'execute_code',
-                node_id: state.activeWorkspaceNode,
-                code: code,
-                language: language
-            }));
-        });
+        if (workspaceRunBtn) {
+            workspaceRunBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!state.activeWorkspaceNode || !state.workspaceSocket || workspaceRunBtn.disabled) return;
+                const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+                if (!node || node.node_type !== 'file') return;
+                const { workspaceEditor } = state.workspaceUI || {};
+                if (!workspaceEditor) return;
+                
+                const code = workspaceEditor.value;
+                const language = node.language || 'python';
+                
+                // Execute code via workspace socket
+                state.workspaceSocket.send(JSON.stringify({
+                    type: 'execute_code',
+                    node_id: state.activeWorkspaceNode,
+                    code: code,
+                    language: language
+                }));
+            });
+        }
 
-        workspaceDownloadBtn?.addEventListener('click', () => {
-            if (!state.activeWorkspaceNode) return;
-            const node = state.workspaceNodes.get(state.activeWorkspaceNode);
-            if (!node || node.node_type !== 'file') return;
-            const blob = new Blob([node.content || ''], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = node.name;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-        });
+        if (workspaceDownloadBtn) {
+            workspaceDownloadBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!state.activeWorkspaceNode || workspaceDownloadBtn.disabled) return;
+                const node = state.workspaceNodes.get(state.activeWorkspaceNode);
+                if (!node || node.node_type !== 'file') return;
+                const { workspaceEditor } = state.workspaceUI || {};
+                const content = workspaceEditor ? workspaceEditor.value : (node.content || '');
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = node.name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            });
+        }
     }
 
     function handleWorkspaceEvent(payload) {
@@ -942,10 +987,15 @@
         if (workspaceEditor) {
             state.workspaceIsApplyingRemote = true;
             workspaceEditor.disabled = false;
+            workspaceEditor.removeAttribute('disabled');
             workspaceEditor.value = node.content || '';
             state.workspaceContent = node.content || '';
             state.workspaceLastContent = node.content || '';
             state.workspaceIsApplyingRemote = false;
+            // Focus the editor after a short delay to ensure it's enabled
+            setTimeout(() => {
+                workspaceEditor.focus();
+            }, 50);
         }
         if (workspaceActive) workspaceActive.textContent = node.full_path || node.name;
         if (workspaceLangBadge) {
@@ -990,8 +1040,10 @@
 
         state.activeWorkspaceNode = null;
         if (workspaceEditor) {
-            workspaceEditor.disabled = true;
+            workspaceEditor.setAttribute('disabled', 'disabled');
             workspaceEditor.value = '';
+            state.workspaceContent = '';
+            state.workspaceLastContent = '';
         }
         if (workspaceActive) workspaceActive.textContent = 'Select a file';
         if (workspaceLangBadge) workspaceLangBadge.classList.add('d-none');

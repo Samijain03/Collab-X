@@ -9,6 +9,12 @@
         expandedFolders: new Set(),
         chatUI: null,
         workspaceUI: null,
+        workspaceContent: '', // Track current content for delta calculation
+        workspaceLastContent: '', // Last known content state
+        workspaceCursors: new Map(), // Map of user_id -> cursor info
+        workspaceUsers: new Map(), // Map of user_id -> user info
+        workspaceIsApplyingRemote: false, // Flag to prevent feedback loops
+        workspaceCursorUpdateTimer: null
     };
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -616,6 +622,34 @@
                 renderWorkspaceTree();
             } else if (data.type === 'workspace_event') {
                 handleWorkspaceEvent(data);
+            } else if (data.type === 'file_update') {
+                handleFileUpdate(data);
+            } else if (data.type === 'cursor_update') {
+                handleCursorUpdate(data);
+            } else if (data.type === 'file_focus') {
+                handleFileFocus(data);
+            } else if (data.type === 'user_joined') {
+                handleUserJoined(data);
+            } else if (data.type === 'user_left') {
+                handleUserLeft(data);
+            } else if (data.type === 'file_list') {
+                // Handle file list updates
+                state.workspaceNodes = new Map();
+                data.files.forEach(node => state.workspaceNodes.set(node.id, node));
+                state.workspaceTree = buildWorkspaceTree(Array.from(state.workspaceNodes.values()));
+                renderWorkspaceTree();
+            } else if (data.type === 'file_content') {
+                // Handle file content response
+                if (data.node_id === state.activeWorkspaceNode) {
+                    const { workspaceEditor } = state.workspaceUI || {};
+                    if (workspaceEditor) {
+                        state.workspaceIsApplyingRemote = true;
+                        workspaceEditor.value = data.content;
+                        state.workspaceContent = data.content;
+                        state.workspaceLastContent = data.content;
+                        state.workspaceIsApplyingRemote = false;
+                    }
+                }
             }
         };
 
@@ -735,21 +769,68 @@
             }
         });
 
-        workspaceEditor?.addEventListener('input', () => {
-            if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
+        // Enhanced input handler with incremental updates
+        workspaceEditor?.addEventListener('input', (e) => {
+            if (!state.activeWorkspaceNode || !state.workspaceSocket || state.workspaceIsApplyingRemote) return;
             const node = state.workspaceNodes.get(state.activeWorkspaceNode);
             if (!node || node.node_type !== 'file') return;
-            if (state.workspaceSaveTimer) {
-                clearTimeout(state.workspaceSaveTimer);
-            }
-            state.workspaceSaveTimer = setTimeout(() => {
-                state.workspaceSocket?.send(JSON.stringify({
-                    action: 'update_content',
+            
+            const newContent = workspaceEditor.value;
+            const oldContent = state.workspaceContent;
+            const cursorPos = workspaceEditor.selectionStart;
+            
+            // Calculate delta (incremental change)
+            const delta = calculateDelta(oldContent, newContent, cursorPos);
+            
+            if (delta) {
+                // Send incremental update
+                state.workspaceSocket.send(JSON.stringify({
+                    type: 'write_file',
                     node_id: state.activeWorkspaceNode,
-                    content: workspaceEditor.value
+                    delta: delta,
+                    cursor_position: cursorPos
                 }));
-            }, 600);
+            }
+            
+            // Update local state
+            state.workspaceContent = newContent;
+            state.workspaceLastContent = newContent;
+            
+            // Update cursor position (throttled)
+            if (state.workspaceCursorUpdateTimer) {
+                clearTimeout(state.workspaceCursorUpdateTimer);
+            }
+            state.workspaceCursorUpdateTimer = setTimeout(() => {
+                sendCursorUpdate();
+            }, 100);
         });
+        
+        // Track cursor movements
+        workspaceEditor?.addEventListener('selectionchange', () => {
+            sendCursorUpdate();
+        });
+        
+        workspaceEditor?.addEventListener('keyup', () => {
+            sendCursorUpdate();
+        });
+        
+        workspaceEditor?.addEventListener('click', () => {
+            sendCursorUpdate();
+        });
+        
+        function sendCursorUpdate() {
+            if (!state.activeWorkspaceNode || !state.workspaceSocket || state.workspaceIsApplyingRemote) return;
+            const { workspaceEditor } = state.workspaceUI || {};
+            if (!workspaceEditor) return;
+            
+            state.workspaceSocket.send(JSON.stringify({
+                type: 'cursor_update',
+                node_id: state.activeWorkspaceNode,
+                cursor_position: workspaceEditor.selectionStart,
+                selection_start: workspaceEditor.selectionStart,
+                selection_end: workspaceEditor.selectionEnd
+            }));
+        }
 
         workspaceRunBtn?.addEventListener('click', () => {
             if (!state.activeWorkspaceNode || !state.workspaceSocket) return;
@@ -817,8 +898,12 @@
         state.activeWorkspaceNode = nodeId;
 
         if (workspaceEditor) {
+            state.workspaceIsApplyingRemote = true;
             workspaceEditor.disabled = false;
             workspaceEditor.value = node.content || '';
+            state.workspaceContent = node.content || '';
+            state.workspaceLastContent = node.content || '';
+            state.workspaceIsApplyingRemote = false;
         }
         if (workspaceActive) workspaceActive.textContent = node.full_path || node.name;
         if (workspaceLangBadge) {
@@ -829,7 +914,16 @@
             if (btn) btn.disabled = false;
         });
 
+        // Notify others that we're viewing this file
+        if (state.workspaceSocket) {
+            state.workspaceSocket.send(JSON.stringify({
+                type: 'file_focus',
+                node_id: nodeId
+            }));
+        }
+
         renderWorkspaceTree();
+        renderUserPresence();
     }
 
     function resetWorkspaceEditor() {
@@ -979,6 +1073,212 @@
     function scrollToBottom(container) {
         if (!container) return;
         container.scrollTop = container.scrollHeight;
+    }
+
+    // Collaborative editing functions
+    function calculateDelta(oldContent, newContent, cursorPos) {
+        // Simple delta calculation - find the change
+        if (oldContent === newContent) return null;
+        
+        // Find the first difference
+        let start = 0;
+        while (start < oldContent.length && start < newContent.length && 
+               oldContent[start] === newContent[start]) {
+            start++;
+        }
+        
+        // Find the last difference from the end
+        let oldEnd = oldContent.length;
+        let newEnd = newContent.length;
+        while (oldEnd > start && newEnd > start && 
+               oldContent[oldEnd - 1] === newContent[newEnd - 1]) {
+            oldEnd--;
+            newEnd--;
+        }
+        
+        const deletedLength = oldEnd - start;
+        const insertedText = newContent.substring(start, newEnd);
+        
+        if (deletedLength === 0 && insertedText.length === 0) return null;
+        
+        return {
+            type: deletedLength > 0 ? (insertedText.length > 0 ? 'replace' : 'delete') : 'insert',
+            position: start,
+            text: insertedText,
+            length: deletedLength
+        };
+    }
+    
+    function applyDelta(content, delta) {
+        if (!delta) return content;
+        
+        const { type, position, text, length } = delta;
+        
+        if (type === 'insert' || type === 'replace') {
+            const before = content.substring(0, position);
+            const after = type === 'replace' 
+                ? content.substring(position + length)
+                : content.substring(position);
+            return before + text + after;
+        } else if (type === 'delete') {
+            return content.substring(0, position) + content.substring(position + length);
+        }
+        
+        return content;
+    }
+    
+    function handleFileUpdate(data) {
+        const { workspaceEditor } = state.workspaceUI || {};
+        if (!workspaceEditor || data.node_id !== state.activeWorkspaceNode) return;
+        
+        // Don't apply our own updates (check if we have currentUserId set)
+        const currentUserId = window.currentUserId || null;
+        if (currentUserId && data.user_id === currentUserId) return;
+        
+        state.workspaceIsApplyingRemote = true;
+        const cursorPos = workspaceEditor.selectionStart;
+        const scrollTop = workspaceEditor.scrollTop;
+        
+        if (data.delta) {
+            // Apply incremental delta
+            state.workspaceContent = applyDelta(state.workspaceContent, data.delta);
+            workspaceEditor.value = state.workspaceContent;
+            state.workspaceLastContent = state.workspaceContent;
+        } else if (data.content !== undefined) {
+            // Fallback to full content update
+            workspaceEditor.value = data.content;
+            state.workspaceContent = data.content;
+            state.workspaceLastContent = data.content;
+        }
+        
+        // Restore cursor position
+        workspaceEditor.setSelectionRange(cursorPos, cursorPos);
+        workspaceEditor.scrollTop = scrollTop;
+        state.workspaceIsApplyingRemote = false;
+        
+        // Show notification
+        if (data.display_name || data.username) {
+            showEditNotification(data.display_name || data.username, data.user_color || '#4ECDC4');
+        }
+    }
+    
+    function handleCursorUpdate(data) {
+        if (data.node_id !== state.activeWorkspaceNode) return;
+        const currentUserId = window.currentUserId || null;
+        if (currentUserId && data.user_id === currentUserId) return;
+        
+        // Store cursor info
+        state.workspaceCursors.set(data.user_id, {
+            position: data.cursor_position,
+            selectionStart: data.selection_start,
+            selectionEnd: data.selection_end,
+            username: data.display_name || data.username,
+            color: data.user_color
+        });
+        
+        renderUserPresence();
+    }
+    
+    function handleFileFocus(data) {
+        const currentUserId = window.currentUserId || null;
+        if (currentUserId && data.user_id === currentUserId) return;
+        
+        // Update user's active file
+        if (!state.workspaceUsers.has(data.user_id)) {
+            state.workspaceUsers.set(data.user_id, {
+                username: data.username,
+                display_name: data.display_name,
+                color: data.user_color,
+                active_file: data.node_id
+            });
+        } else {
+            const user = state.workspaceUsers.get(data.user_id);
+            user.active_file = data.node_id;
+        }
+        
+        renderUserPresence();
+    }
+    
+    function handleUserJoined(data) {
+        state.workspaceUsers.set(data.user_id, {
+            username: data.username,
+            display_name: data.display_name,
+            color: data.user_color,
+            active_file: null
+        });
+        renderUserPresence();
+    }
+    
+    function handleUserLeft(data) {
+        state.workspaceUsers.delete(data.user_id);
+        state.workspaceCursors.delete(data.user_id);
+        renderUserPresence();
+    }
+    
+    function renderUserPresence() {
+        // Create or update user presence indicator
+        let presenceContainer = document.getElementById('workspace-user-presence');
+        if (!presenceContainer && state.workspaceUI?.workspaceActive) {
+            presenceContainer = document.createElement('div');
+            presenceContainer.id = 'workspace-user-presence';
+            presenceContainer.className = 'workspace-user-presence';
+            presenceContainer.style.cssText = 'display: flex; gap: 8px; align-items: center; padding: 4px 8px; background: rgba(0,0,0,0.3); border-radius: 4px; margin-top: 4px; flex-wrap: wrap;';
+            state.workspaceUI.workspaceActive.parentElement.appendChild(presenceContainer);
+        }
+        
+        if (!presenceContainer) return;
+        
+        // Clear and rebuild
+        presenceContainer.innerHTML = '';
+        
+        const activeUsers = Array.from(state.workspaceUsers.values()).filter(
+            user => user.active_file === state.activeWorkspaceNode
+        );
+        
+        if (activeUsers.length === 0) {
+            presenceContainer.style.display = 'none';
+            return;
+        }
+        
+        presenceContainer.style.display = 'flex';
+        activeUsers.forEach(user => {
+            const badge = document.createElement('span');
+            badge.className = 'user-presence-badge';
+            badge.style.cssText = `display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: ${user.color}20; border: 1px solid ${user.color}; border-radius: 12px; font-size: 11px; color: ${user.color};`;
+            badge.innerHTML = `<span style="width: 6px; height: 6px; background: ${user.color}; border-radius: 50%; display: inline-block;"></span> ${user.display_name || user.username}`;
+            presenceContainer.appendChild(badge);
+        });
+    }
+    
+    function showEditNotification(username, color) {
+        // Show a subtle notification that someone edited
+        const notification = document.createElement('div');
+        notification.className = 'edit-notification';
+        notification.style.cssText = `position: fixed; top: 20px; right: 20px; padding: 8px 12px; background: ${color}20; border-left: 3px solid ${color}; border-radius: 4px; color: ${color}; font-size: 12px; z-index: 10000; animation: slideIn 0.3s ease;`;
+        notification.textContent = `${username} is editing...`;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 2000);
+    }
+    
+    // Add CSS animations if not present
+    if (!document.getElementById('workspace-collab-styles')) {
+        const style = document.createElement('style');
+        style.id = 'workspace-collab-styles';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     function getCsrfToken() {

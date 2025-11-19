@@ -29,26 +29,30 @@ def save_user_profile(sender, instance, **kwargs):
 
 class Message(models.Model):
     # ... (keep the Message model as it is) ...
-    sender = models.ForeignKey(User, related_name="sent_messages", on_delete=models.CASCADE)
-    receiver = models.ForeignKey(User, related_name="received_messages", on_delete=models.CASCADE)
+    sender = models.ForeignKey(User, related_name="sent_messages", on_delete=models.CASCADE, db_index=True)
+    receiver = models.ForeignKey(User, related_name="received_messages", on_delete=models.CASCADE, db_index=True)
     content = models.TextField(blank=True)
     file = models.FileField(upload_to='chat_attachments/', blank=True, null=True)
     file_name = models.CharField(max_length=255, blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    is_deleted = models.BooleanField(default=False)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
 
     def __str__(self):
         return f"From {self.sender.username} to {self.receiver.username}"
 
     class Meta:
         ordering = ['timestamp']
+        indexes = [
+            models.Index(fields=['sender', 'receiver', 'timestamp']),
+            models.Index(fields=['sender', 'receiver', 'is_deleted', 'timestamp']),
+        ]
 
 # --- ADD THIS NEW MODEL ---
 class ContactRequest(models.Model):
     """Model to represent a pending contact request."""
-    from_user = models.ForeignKey(User, related_name='sent_contact_requests', on_delete=models.CASCADE)
-    to_user = models.ForeignKey(User, related_name='received_contact_requests', on_delete=models.CASCADE)
-    timestamp = models.DateTimeField(auto_now_add=True)
+    from_user = models.ForeignKey(User, related_name='sent_contact_requests', on_delete=models.CASCADE, db_index=True)
+    to_user = models.ForeignKey(User, related_name='received_contact_requests', on_delete=models.CASCADE, db_index=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"Request from {self.from_user.username} to {self.to_user.username}"
@@ -56,6 +60,9 @@ class ContactRequest(models.Model):
     class Meta:
         # Ensures a user can only send one request to another user at a time
         unique_together = ('from_user', 'to_user')
+        indexes = [
+            models.Index(fields=['to_user', 'timestamp']),
+        ]
 
 # --- ADD THESE NEW MODELS FOR GROUP CHAT ---
 
@@ -69,16 +76,20 @@ class Group(models.Model):
         return self.name
 
 class GroupMessage(models.Model):
-    group = models.ForeignKey(Group, related_name='messages', on_delete=models.CASCADE)
-    sender = models.ForeignKey(User, related_name='group_messages', on_delete=models.CASCADE)
+    group = models.ForeignKey(Group, related_name='messages', on_delete=models.CASCADE, db_index=True)
+    sender = models.ForeignKey(User, related_name='group_messages', on_delete=models.CASCADE, db_index=True)
     content = models.TextField(blank=True)
     file = models.FileField(upload_to='chat_attachments/', blank=True, null=True)
     file_name = models.CharField(max_length=255, blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    is_deleted = models.BooleanField(default=False)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
 
     class Meta:
         ordering = ['timestamp']
+        indexes = [
+            models.Index(fields=['group', 'timestamp']),
+            models.Index(fields=['group', 'is_deleted', 'timestamp']),
+        ]
 
     def __str__(self):
         return f'{self.sender.username} in {self.group.name}: {self.content[:20]}'
@@ -101,18 +112,21 @@ class WorkspaceNode(models.Model):
 
     workspace_key = models.CharField(max_length=64, db_index=True)
     name = models.CharField(max_length=120)
-    node_type = models.CharField(max_length=12, choices=NodeType.choices)
+    node_type = models.CharField(max_length=12, choices=NodeType.choices, db_index=True)
     language = models.CharField(max_length=20, choices=LANGUAGE_CHOICES, blank=True, null=True)
     content = models.TextField(blank=True)
-    parent = models.ForeignKey('self', related_name='children', null=True, blank=True, on_delete=models.CASCADE)
+    parent = models.ForeignKey('self', related_name='children', null=True, blank=True, on_delete=models.CASCADE, db_index=True)
     position = models.PositiveIntegerField(default=0)
-    created_by = models.ForeignKey(User, related_name='workspace_nodes', on_delete=models.CASCADE)
+    created_by = models.ForeignKey(User, related_name='workspace_nodes', on_delete=models.CASCADE, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ('workspace_key', 'parent', 'name')
         ordering = ['position', 'name']
+        indexes = [
+            models.Index(fields=['workspace_key', 'node_type']),
+        ]
 
     def __str__(self):
         return f'{self.workspace_key}::{self.full_path}'

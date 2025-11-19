@@ -77,10 +77,13 @@ def logout_view(request):
 # --- REPLACED: Dashboard View (Handles 1-to-1 and Group) ---
 @login_required
 def dashboard_view(request, contact_id=None, group_id=None):
+    # Optimize: Use select_related to avoid N+1 queries
     profile = request.user.profile
-    contacts_profiles = profile.contacts.all()
-    user_groups = request.user.chat_groups.all()
-    incoming_requests = ContactRequest.objects.filter(to_user=request.user)
+    contacts_profiles = profile.contacts.select_related('user').all()
+    user_groups = request.user.chat_groups.prefetch_related('members', 'creator').all()
+    incoming_requests = ContactRequest.objects.filter(
+        to_user=request.user
+    ).select_related('from_user', 'from_user__profile')
     
     context = {
         'contacts': contacts_profiles,
@@ -96,17 +99,20 @@ def dashboard_view(request, contact_id=None, group_id=None):
 
     if contact_id:
         try:
-            selected_contact_profile = Profile.objects.get(user__id=contact_id)
+            # Optimize: Use select_related to fetch user in same query
+            selected_contact_profile = Profile.objects.select_related('user').get(user__id=contact_id)
             selected_contact_user = selected_contact_profile.user
             
             if selected_contact_profile in contacts_profiles:
                 context['selected_contact'] = selected_contact_profile
                 
+                # Optimize: Use select_related for sender/receiver, limit to last 100 messages
                 messages_query = Message.objects.filter(
                     (Q(sender=request.user) & Q(receiver=selected_contact_user)) |
                     (Q(sender=selected_contact_user) & Q(receiver=request.user))
-                ).order_by('timestamp')
-                context['messages'] = messages_query
+                ).select_related('sender', 'sender__profile', 'receiver', 'receiver__profile').order_by('-timestamp')[:100]
+                # Reverse to show oldest first
+                context['messages'] = list(reversed(messages_query))
                 context['chat_type'] = '1on1'
                 context['chat_id'] = selected_contact_profile.user.id
             else:
@@ -118,10 +124,16 @@ def dashboard_view(request, contact_id=None, group_id=None):
             
     elif group_id:
         try:
-            selected_group = Group.objects.get(id=group_id)
+            # Optimize: Use select_related and prefetch_related
+            selected_group = Group.objects.prefetch_related('members', 'creator').get(id=group_id)
             if selected_group in user_groups:
                 context['selected_group'] = selected_group
-                context['messages'] = selected_group.messages.all().order_by('timestamp')
+                # Optimize: Use select_related for sender, limit to last 100 messages
+                group_messages = selected_group.messages.select_related(
+                    'sender', 'sender__profile'
+                ).order_by('-timestamp')[:100]
+                # Reverse to show oldest first
+                context['messages'] = list(reversed(group_messages))
                 context['chat_type'] = 'group'
                 context['chat_id'] = selected_group.id
             else:
@@ -157,9 +169,10 @@ def search_users_view(request):
     query = request.GET.get('q')
     results = []
     if query:
+        # Optimize: Use select_related to avoid N+1 queries when accessing profile
         results = User.objects.filter(
             Q(username__icontains=query)
-        ).exclude(username=request.user.username)
+        ).select_related('profile').exclude(username=request.user.username)[:50]  # Limit results
     context = {'results': results}
     return render(request, 'chatapp/search_results.html', context)
 
@@ -437,10 +450,10 @@ def upload_attachment_view(request, chat_type, chat_id):
             'message_id': message.id,
             'message': message.content,
             'sender_username': request.user.username,
+            'sender_display_name': request.user.profile.display_name or request.user.username,
             'timestamp': timestamp,
             'attachment_url': message.file.url if message.file else '',
             'attachment_name': message.file_name or uploaded_file.name,
-            'sender_display_name': request.user.profile.display_name or request.user.username,
         }
 
     async_to_sync(channel_layer.group_send)(

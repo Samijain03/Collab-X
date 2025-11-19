@@ -1340,6 +1340,7 @@
         const chatType = "{{ chat_type|default:'' }}";
         const chatId = "{{ chat_id|default:'' }}";
         const currentUsername = "{{ user.username }}";
+        window.currentUserId = {{ user.id }};
 
         if (chatType && chatId) {
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

@@ -191,8 +191,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'chat_message', 
             'message_id': event['message_id'], 
-            'content': event['message'],
+            'content': event.get('message') or event.get('content', ''),
             'sender_username': event['sender_username'],
+            'sender_display_name': event.get('sender_display_name'),
+            'attachment_url': event.get('attachment_url', ''),
+            'attachment_name': event.get('attachment_name', ''),
             'timestamp': event['timestamp'],
         }))
 
@@ -344,9 +347,11 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'chat_message', 
             'message_id': event['message_id'], 
-            'content': event['message'],
+            'content': event.get('message') or event.get('content', ''),
             'sender_username': event['sender_username'],
             'sender_display_name': event.get('sender_display_name'),
+            'attachment_url': event.get('attachment_url', ''),
+            'attachment_name': event.get('attachment_name', ''),
             'timestamp': event['timestamp'],
         }))
         
@@ -413,6 +418,11 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
         self.user_color = await self.get_user_color()
 
         if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        has_access = await self.check_workspace_access(self.user, self.workspace_key)
+        if not has_access:
             await self.close()
             return
 
@@ -568,6 +578,14 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
             if node_id:
                 await self.delete_node(node_id)
                 await self.broadcast_file_list()
+
+        elif message_type == 'rename_node':
+            node_id = data.get('node_id')
+            name = data.get('name')
+            if node_id and name and name.strip():
+                renamed = await self.rename_node(node_id, name.strip())
+                if renamed:
+                    await self.broadcast_file_list()
         
         elif message_type == 'execute_code':
             node_id = data.get('node_id')
@@ -686,8 +704,52 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
         ]
 
     @database_sync_to_async
+    def check_workspace_access(self, user, workspace_key):
+        if not workspace_key or not user.is_authenticated:
+            return False
+        if workspace_key.startswith('chat_'):
+            parts = workspace_key.split('_')
+            if len(parts) == 3:
+                try:
+                    user1_id = int(parts[1])
+                    user2_id = int(parts[2])
+                    if user.id in (user1_id, user2_id):
+                        other_id = user2_id if user.id == user1_id else user1_id
+                        return user.profile.contacts.filter(user__id=other_id).exists()
+                except (ValueError, TypeError):
+                    return False
+        elif workspace_key.startswith('group_'):
+            parts = workspace_key.split('_')
+            if len(parts) == 2:
+                try:
+                    group_id = int(parts[1])
+                    return Group.objects.filter(id=group_id, members=user).exists()
+                except (ValueError, TypeError):
+                    return False
+        return False
+
+    @database_sync_to_async
     def create_node(self, name, node_type, parent_id):
         from .models import WorkspaceNode
+        from .workspace_utils import guess_language, ensure_path
+        
+        name = name.strip() if name else ''
+        if not name:
+            return None
+
+        # If name has nested path separators (e.g. backend/app.py), use ensure_path
+        if '/' in name or '\\' in name:
+            try:
+                return ensure_path(
+                    self.workspace_key,
+                    name,
+                    user=self.user,
+                    node_type=node_type
+                )
+            except Exception as e:
+                print(f"Error creating path node: {e}")
+                return None
+
         parent = None
         if parent_id:
             try:
@@ -695,15 +757,7 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
             except WorkspaceNode.DoesNotExist:
                 return None
         
-        # Simple language detection based on extension
-        language = 'text'
-        if node_type == 'file':
-            if name.endswith('.py'): language = 'python'
-            elif name.endswith('.html'): language = 'html'
-            elif name.endswith('.js'): language = 'javascript'
-            elif name.endswith('.css'): language = 'css'
-            elif name.endswith('.json'): language = 'json'
-            elif name.endswith('.md'): language = 'markdown'
+        language = guess_language(name, fallback='text') if node_type == 'file' else None
 
         try:
             return WorkspaceNode.objects.create(
@@ -716,6 +770,21 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
             )
         except Exception as e:
             print(f"Error creating node: {e}")
+            return None
+
+    @database_sync_to_async
+    def rename_node(self, node_id, new_name):
+        from .models import WorkspaceNode
+        from .workspace_utils import guess_language
+        try:
+            node = WorkspaceNode.objects.get(id=node_id, workspace_key=self.workspace_key)
+            node.name = new_name.strip()
+            if node.is_file:
+                node.language = guess_language(node.name, fallback='text')
+            node.save()
+            return node
+        except Exception as e:
+            print(f"Error renaming node: {e}")
             return None
 
     @database_sync_to_async
@@ -749,16 +818,13 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
             
             if delta_type == 'insert':
                 text = delta.get('text', '')
-                # Insert text at position
                 node.content = content[:position] + text + content[position:]
             elif delta_type == 'delete':
                 length = delta.get('length', 0)
-                # Delete text at position
                 node.content = content[:position] + content[position + length:]
             elif delta_type == 'replace':
                 text = delta.get('text', '')
                 length = delta.get('length', 0)
-                # Replace text at position
                 node.content = content[:position] + text + content[position + length:]
             
             node.save()
@@ -772,7 +838,6 @@ class WorkspaceConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_user_color(self):
         """Generate a consistent color for the user based on their ID."""
-        # Simple hash-based color generation
         user_id = self.user.id
         colors = [
             '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',

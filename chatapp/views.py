@@ -172,13 +172,13 @@ def dashboard_view(request, contact_id=None, group_id=None):
 
 @login_required
 def search_users_view(request):
-    query = request.GET.get('q')
+    query = request.GET.get('q', '').strip()
     results = []
     if query:
-        # Optimize: Use select_related to avoid N+1 queries when accessing profile
+        # Optimize: Use select_related and search both username and display name
         results = User.objects.filter(
-            Q(username__icontains=query)
-        ).select_related('profile').exclude(username=request.user.username)[:50]  # Limit results
+            Q(username__icontains=query) | Q(profile__display_name__icontains=query)
+        ).select_related('profile').exclude(id=request.user.id).distinct()[:50]
     context = {'results': results}
     return render(request, 'chatapp/search_results.html', context)
 
@@ -186,15 +186,30 @@ def search_users_view(request):
 def send_contact_request_view(request, user_id):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     try:
-        user_to_request = User.objects.get(id=user_id)
+        user_to_request = User.objects.select_related('profile').get(id=user_id)
+        if user_to_request.id == request.user.id:
+            msg = 'You cannot send a contact request to yourself.'
+            if is_ajax: return JsonResponse({'status': 'error', 'message': msg}, status=400)
+            messages.error(request, msg)
+            return redirect('chatapp:search_users')
+
         if request.user.profile.contacts.filter(user=user_to_request).exists():
-             msg = f'You are already contacts with {user_to_request.username}.'
-             if is_ajax: return JsonResponse({'status': 'info', 'message': msg})
-             messages.info(request, msg)
+            msg = f'You are already contacts with {user_to_request.username}.'
+            if is_ajax: return JsonResponse({'status': 'info', 'message': msg})
+            messages.info(request, msg)
         elif ContactRequest.objects.filter(from_user=request.user, to_user=user_to_request).exists():
             msg = 'You have already sent a request to this user.'
             if is_ajax: return JsonResponse({'status': 'info', 'message': msg})
             messages.info(request, msg)
+        elif ContactRequest.objects.filter(from_user=user_to_request, to_user=request.user).exists():
+            # Mutual request: auto accept
+            existing_req = ContactRequest.objects.get(from_user=user_to_request, to_user=request.user)
+            request.user.profile.contacts.add(user_to_request.profile)
+            user_to_request.profile.contacts.add(request.user.profile)
+            existing_req.delete()
+            msg = f'Mutual request connected! You and {user_to_request.username} are now contacts.'
+            if is_ajax: return JsonResponse({'status': 'success', 'message': msg, 'mutual': True})
+            messages.success(request, msg)
         else:
             ContactRequest.objects.create(from_user=request.user, to_user=user_to_request)
             msg = f'Contact request sent to {user_to_request.username}!'
@@ -427,6 +442,18 @@ def upload_attachment_view(request, chat_type, chat_id):
 
     if not uploaded_file:
         return HttpResponseBadRequest("No file provided.")
+
+    # 25 MB file size limit
+    max_size = 25 * 1024 * 1024
+    if uploaded_file.size > max_size:
+        return HttpResponseBadRequest("File size exceeds the 25MB limit.")
+
+    # Disallow executable files
+    import os
+    _, ext = os.path.splitext(uploaded_file.name.lower())
+    disallowed_extensions = {'.exe', '.bat', '.sh', '.cmd', '.vbs', '.msi', '.com', '.scr', '.ps1', '.dll', '.so'}
+    if ext in disallowed_extensions:
+        return HttpResponseBadRequest("Executable files are not permitted for upload.")
 
     channel_layer = get_channel_layer()
     timestamp = timezone.now().strftime("%I:%M %p")

@@ -35,8 +35,8 @@ def get_collab_response(chat_history_string, user_query):
     if not settings.GOOGLE_GEMINI_API_KEY:
          return "Sorry, the bot is not configured. (Missing API Key)"
          
-    # Use a fast model
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # Use standard fast model
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
     # --- UPDATED "Personality" Prompt ---
     prompt = f"""

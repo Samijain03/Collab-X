@@ -807,10 +807,13 @@
                 if (!state.activeWorkspaceNode || !state.workspaceSocket || workspaceRenameBtn.disabled) return;
                 const node = state.workspaceNodes.get(state.activeWorkspaceNode);
                 if (!node) return;
-                const newName = prompt('Rename', node.name);
-                if (newName && newName.trim() !== node.name) {
-                    // Note: Rename functionality needs to be implemented in backend
-                    alert('Rename functionality coming soon!');
+                const newName = prompt('Enter new name:', node.name);
+                if (newName && newName.trim() && newName.trim() !== node.name) {
+                    state.workspaceSocket.send(JSON.stringify({
+                        type: 'rename_node',
+                        node_id: state.activeWorkspaceNode,
+                        name: newName.trim()
+                    }));
                 }
             });
         }

@@ -28,13 +28,24 @@ load_dotenv(BASE_DIR / '.env')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-zik7rk)ip_ghw()=3ek)nd6he&k*fnj%y5%xhn7u*7*zj$1k!%'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-zik7rk)ip_ghw()=3ek)nd6he&k*fnj%y5%xhn7u*7*zj$1k!%')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = [os.environ.get('ALLOWED_HOSTS')]
-CSRF_TRUSTED_ORIGINS = [f"https://{os.environ.get('ALLOWED_HOSTS')}"]
+_allowed_hosts_str = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost')
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_str.split(',') if h.strip()]
+
+_csrf_origins = []
+for _host in ALLOWED_HOSTS:
+    if _host and _host != '*':
+        _csrf_origins.extend([
+            f"http://{_host}",
+            f"https://{_host}",
+            f"http://{_host}:8000",
+            f"https://{_host}:8000",
+        ])
+CSRF_TRUSTED_ORIGINS = _csrf_origins or ['http://127.0.0.1:8000', 'http://localhost:8000']
 
 # Application definition
 
@@ -102,7 +113,7 @@ WSGI_APPLICATION = 'Collab_X.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
+        default=os.environ.get('DATABASE_URL') or f'sqlite:///{BASE_DIR / "db.sqlite3"}',
         conn_max_age=600
     )
 }
@@ -168,30 +179,19 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 MEDIA_URL = '/media/'
 # In settings.py
 
-# --- Backblaze B2 (Private Bucket) Media Storage ---
-
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-
-# Get credentials from Render environment variables
+# --- Backblaze B2 / S3 Media Storage ---
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-
-# This is the critical part for Backblaze
 AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL')
-
-# Ensure new files don't overwrite old ones
 AWS_S3_FILE_OVERWRITE = False
-
-# --- NEW CHANGES FOR PRIVATE BUCKET ---
-
-# 1. Files are private by default
-AWS_DEFAULT_ACL = None  # Use None for private
-
-# 2. We MUST use query string auth to generate temporary links
+AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = True
 
-# --- End of B2 Config ---
+# Enable S3 storage only if valid AWS credentials are configured
+if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # --- ADD THIS ---

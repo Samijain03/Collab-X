@@ -85,9 +85,6 @@
                         <i class="bi bi-trash"></i>
                     </button>
                     {% endif %}
-                    {% if message.sender.profile.display_name %}
-                        <small class="text-muted d-block">{{ message.sender.profile.display_name }}</small>
-                    {% endif %}
                 {% endif %}
                 <span class="message-time">{{ message.timestamp|date:"h:i A" }}</span>
             </div>

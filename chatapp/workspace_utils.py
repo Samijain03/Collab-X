@@ -154,9 +154,9 @@ def parse_collab_command(command_text: str) -> tuple[Optional[str], Optional[str
     """
     import re
     
-    # Pattern: /Collab [file|folder] path: instructions
-    # Or: /Collab file path/to/file.py language: instructions
-    file_pattern = r'/Collab\s+file\s+([^\s:]+)(?:\s+(\w+):)?\s*:?\s*(.*)'
+    # Pattern 1: /Collab (file|create) <path> [language]: <instructions>
+    file_pattern = r'/Collab\s+(?:file|create)\s+([^\s:]+)(?:\s+(\w+):)?\s*:?\s*(.*)'
+    # Pattern 2: /Collab folder <path>: <instructions>
     folder_pattern = r'/Collab\s+folder\s+([^\s:]+)\s*:?\s*(.*)'
     
     file_match = re.match(file_pattern, command_text, re.IGNORECASE)
@@ -164,7 +164,7 @@ def parse_collab_command(command_text: str) -> tuple[Optional[str], Optional[str
         path = file_match.group(1).strip()
         language = file_match.group(2) if file_match.group(2) else None
         instructions = file_match.group(3).strip()
-        return ('file', path, instructions, language)
+        return ('file', path, instructions or f"Generate code for {path}", language)
     
     folder_match = re.match(folder_pattern, command_text, re.IGNORECASE)
     if folder_match:
@@ -172,7 +172,8 @@ def parse_collab_command(command_text: str) -> tuple[Optional[str], Optional[str
         instructions = folder_match.group(2).strip()
         return ('folder', path, instructions, None)
     
-    return (None, None, command_text.replace('/Collab', '').strip(), None)
+    cleaned = command_text.replace('/Collab hidden', '').replace('/Collab', '').strip()
+    return (None, None, cleaned, None)
 
 
 def extract_code_blocks(text: str) -> list[dict[str, str]]:
@@ -183,8 +184,6 @@ def extract_code_blocks(text: str) -> list[dict[str, str]]:
     import re
     
     blocks = []
-    
-    # Pattern: ```language:filename or ```filename or ```language
     pattern = r'```(?:(\w+)(?::([^\n]+))?|([^\n]+))?\n(.*?)```'
     
     for match in re.finditer(pattern, text, re.DOTALL):
@@ -199,9 +198,7 @@ def extract_code_blocks(text: str) -> list[dict[str, str]]:
                 'content': content
             })
     
-    # If no code blocks but text looks like code, treat entire response as code
     if not blocks and text.strip():
-        # Check if it looks like code (has indentation, keywords, etc.)
         lines = text.strip().split('\n')
         if len(lines) > 3 or any(line.strip().startswith(('def ', 'class ', 'import ', 'from ', '<!', 'function ', 'const ', 'let ')) for line in lines[:5]):
             blocks.append({
@@ -211,3 +208,21 @@ def extract_code_blocks(text: str) -> list[dict[str, str]]:
             })
     
     return blocks
+
+
+def apply_ai_code_to_workspace(
+    workspace_key: str,
+    user: User,
+    target_path: str,
+    content: str,
+    language: Optional[str] = None
+) -> WorkspaceNode:
+    """Save AI-generated code directly into a WorkspaceNode."""
+    return ensure_path(
+        workspace_key=workspace_key,
+        path=target_path,
+        user=user,
+        node_type=WorkspaceNode.NodeType.FILE,
+        language=language,
+        content=content
+    )

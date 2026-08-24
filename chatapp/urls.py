@@ -30,6 +30,7 @@ urlpatterns = [
     path('accept-request/<int:request_id>/', views.accept_contact_request_view, name='accept_contact_request'),
     path('decline-request/<int:request_id>/', views.decline_contact_request_view, name='decline_contact_request'),
 
-    # Attachments
+    # Attachments & Workspace Export
     path('chat/<str:chat_type>/<int:chat_id>/attachment/', views.upload_attachment_view, name='upload_attachment'),
+    path('workspace/<str:workspace_key>/export-zip/', views.export_workspace_zip_view, name='export_workspace_zip'),
 ]

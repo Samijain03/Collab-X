@@ -36,6 +36,7 @@
 
         const elements = gatherElements(chatContainer);
 
+        renderExistingMessages(elements.chatMessages);
         scrollToBottom(elements.chatMessages);
         setupMobileSidebar(elements);
         setupEmojiPicker(elements);
@@ -45,6 +46,24 @@
         setupMessageActions(elements);
         setupWorkspaceToggle(elements);
         setupWorkspaceModule(elements);
+    }
+
+    function renderExistingMessages(chatMessages) {
+        if (!chatMessages) return;
+        chatMessages.querySelectorAll('.message-bubble').forEach(bubble => {
+            const p = bubble.querySelector('p');
+            if (p && !p.classList.contains('fst-italic') && !p.dataset.richRendered) {
+                const raw = p.textContent;
+                if (raw.includes('```') || raw.includes('`') || raw.includes('**') || raw.includes('* ') || raw.includes('#') || raw.includes('\n')) {
+                    const rich = renderRichContent(raw);
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'message-text-content';
+                    wrapper.innerHTML = rich;
+                    p.replaceWith(wrapper);
+                }
+                p.dataset.richRendered = 'true';
+            }
+        });
     }
 
     function gatherElements(container) {
@@ -309,6 +328,61 @@
         state.chatSocket.onclose = (event) => console.warn('Chat socket closed', event.reason);
     }
 
+    function renderRichContent(rawText) {
+        if (!rawText) return '';
+        if (window.marked) {
+            try {
+                marked.setOptions({
+                    gfm: true,
+                    breaks: true,
+                    highlight: function(code, lang) {
+                        if (window.hljs && lang && hljs.getLanguage(lang)) {
+                            try {
+                                return hljs.highlight(code, { language: lang }).value;
+                            } catch (err) {}
+                        }
+                        if (window.hljs) {
+                            try {
+                                return hljs.highlightAuto(code).value;
+                            } catch (err) {}
+                        }
+                        return code;
+                    }
+                });
+                const html = marked.parse(rawText);
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                tempDiv.querySelectorAll('pre').forEach(pre => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'code-block-wrapper';
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'code-copy-btn';
+                    copyBtn.type = 'button';
+                    copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
+                    copyBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const code = pre.querySelector('code')?.innerText || pre.innerText;
+                        navigator.clipboard.writeText(code).then(() => {
+                            copyBtn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
+                            setTimeout(() => {
+                                copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
+                            }, 2000);
+                        });
+                    });
+                    pre.parentNode.insertBefore(wrapper, pre);
+                    wrapper.appendChild(pre);
+                    wrapper.appendChild(copyBtn);
+                });
+                return tempDiv.innerHTML;
+            } catch (e) {
+                console.warn("Markdown rendering failed", e);
+            }
+        }
+        const div = document.createElement('div');
+        div.textContent = rawText;
+        return div.innerHTML;
+    }
+
     function handleChatMessage(event) {
         if (!state.chatUI || !state.chatUI.chatMessages) return;
         const data = JSON.parse(event.data);
@@ -328,6 +402,8 @@
             });
             container.appendChild(bubble);
             scrollToBottom(container);
+            // Hide typing indicator if this sender sent a message
+            handleUserTyping({ is_typing: false, username: data.sender_username });
         } else if (data.type === 'message_deleted') {
             const bubble = container.querySelector(`.message-bubble[data-message-id='${data.message_id}']`);
             if (bubble) {
@@ -338,6 +414,43 @@
             }
         } else if (data.type === 'bot_message') {
             handleBotMessage(data);
+        } else if (data.type === 'user_typing') {
+            handleUserTyping(data);
+        } else if (data.type === 'user_presence') {
+            handleUserPresence(data);
+        }
+    }
+
+    function handleUserTyping(data) {
+        const typingIndicator = document.getElementById('typing-indicator');
+        const typingText = document.getElementById('typing-text');
+        if (!typingIndicator || !typingText) return;
+
+        if (data.is_typing) {
+            const name = data.display_name || data.username || 'Someone';
+            typingText.textContent = `${name} is typing...`;
+            typingIndicator.classList.remove('d-none');
+            const container = state.chatUI?.chatMessages;
+            if (container) scrollToBottom(container);
+        } else {
+            typingIndicator.classList.add('d-none');
+        }
+    }
+
+    function handleUserPresence(data) {
+        const statusDot = document.getElementById('chat-header-status-dot');
+        if (statusDot) {
+            if (data.status === 'online') {
+                statusDot.className = 'user-status-dot online';
+                statusDot.title = 'Online';
+            } else {
+                statusDot.className = 'user-status-dot offline';
+                statusDot.title = 'Offline';
+            }
+        }
+        const contactBadge = document.querySelector(`.contact-item[data-username="${data.username}"] .user-status-dot`);
+        if (contactBadge) {
+            contactBadge.className = `user-status-dot ${data.status === 'online' ? 'online' : 'offline'}`;
         }
     }
 
@@ -358,7 +471,7 @@
             if (existing) {
                 const contentP = existing.querySelector(`#bot-content-${data.request_id}`);
                 if (contentP) {
-                    contentP.textContent = data.content;
+                    contentP.innerHTML = renderRichContent(data.content);
                 }
                 if (data.jump_id) {
                     const jumpContainer = existing.querySelector(`#bot-jump-${data.request_id}`);
@@ -379,10 +492,42 @@
     function setupChatForm({ chatForm, messageInput }) {
         if (!chatForm || !messageInput) return;
 
+        let typingTimeout = null;
+        let isTypingSent = false;
+
+        messageInput.addEventListener('input', () => {
+            if (!state.chatSocket || state.chatSocket.readyState !== WebSocket.OPEN) return;
+            if (!isTypingSent) {
+                state.chatSocket.send(JSON.stringify({
+                    type: 'typing',
+                    is_typing: true
+                }));
+                isTypingSent = true;
+            }
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                if (isTypingSent && state.chatSocket && state.chatSocket.readyState === WebSocket.OPEN) {
+                    state.chatSocket.send(JSON.stringify({
+                        type: 'typing',
+                        is_typing: false
+                    }));
+                    isTypingSent = false;
+                }
+            }, 2000);
+        });
+
         chatForm.addEventListener('submit', (event) => {
             event.preventDefault();
             const message = messageInput.value.trim();
             if (message && state.chatSocket) {
+                clearTimeout(typingTimeout);
+                if (isTypingSent) {
+                    state.chatSocket.send(JSON.stringify({
+                        type: 'typing',
+                        is_typing: false
+                    }));
+                    isTypingSent = false;
+                }
                 state.chatSocket.send(JSON.stringify({
                     type: 'chat_message',
                     message
@@ -1098,8 +1243,9 @@
         }
 
         if (content) {
-            const contentNode = document.createElement('p');
-            contentNode.textContent = content;
+            const contentNode = document.createElement('div');
+            contentNode.className = 'message-text-content';
+            contentNode.innerHTML = renderRichContent(content);
             bubble.appendChild(contentNode);
         }
 
@@ -1153,9 +1299,10 @@
         header.innerHTML = `<i class="bi bi-robot"></i>${senderUsername}`;
         wrapper.appendChild(header);
 
-        const contentP = document.createElement('p');
+        const contentP = document.createElement('div');
         contentP.id = `bot-content-${requestId}`;
-        contentP.textContent = content;
+        contentP.className = 'bot-content-body';
+        contentP.innerHTML = renderRichContent(content);
         wrapper.appendChild(contentP);
 
         const jumpContainer = document.createElement('div');

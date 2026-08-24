@@ -14,14 +14,17 @@
                         <img src="{{ selected_contact.profile_picture.url }}" alt="{{ selected_contact.display_name|default:selected_contact.user.username }}">
                     </a>
                     <div class="chat-header-text">
-                        <h6>{{ selected_contact.display_name|default:selected_contact.user.username }}</h6>
+                        <div class="d-flex align-items-center gap-2">
+                            <h6 class="mb-0">{{ selected_contact.display_name|default:selected_contact.user.username }}</h6>
+                            <span class="user-status-dot offline" id="chat-header-status-dot" title="Offline"></span>
+                        </div>
                         <small>@{{ selected_contact.user.username }}</small>
                     </div>
                 {% elif selected_group %}
                     <div class="group-icon">{{ selected_group.name|first|upper }}</div>
                     <div class="chat-header-text">
                         <h6>{{ selected_group.name }}</h6>
-                        <small>{{ selected_group.members.count }} member{{ selected_group.members.count|pluralize }}</small>
+                        <small id="group-member-count">{{ selected_group.members.count }} member{{ selected_group.members.count|pluralize }}</small>
                     </div>
                 {% endif %}
             </div>
@@ -94,6 +97,13 @@
                 <p class="mt-2">Start the conversation</p>
             </div>
             {% endfor %}
+        </div>
+
+        <div class="typing-indicator-bar d-none" id="typing-indicator">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-text ms-2" id="typing-text">Someone is typing...</span>
         </div>
 
         <div class="chat-input">

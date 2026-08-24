@@ -114,3 +114,56 @@ class CodeExecutorSafetyTestCase(TestCase):
         is_safe, msg = validate_code_safety('eval("__import__(\'os\').system(\'ls\')")')
         self.assertFalse(is_safe)
 
+
+class WorkspaceZipExportAndAITestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.alice = User.objects.create_user(username='alice', password='password123')
+        self.bob = User.objects.create_user(username='bob', password='password123')
+        self.alice.profile.contacts.add(self.bob.profile)
+        self.bob.profile.contacts.add(self.alice.profile)
+        
+        user_ids = sorted([self.alice.id, self.bob.id])
+        self.workspace_key = f"chat_{user_ids[0]}_{user_ids[1]}"
+        
+        # Create test nodes
+        ensure_path(
+            workspace_key=self.workspace_key,
+            path='src/main.py',
+            user=self.alice,
+            content='print("Hello Alice & Bob")'
+        )
+
+    def test_export_workspace_zip(self):
+        import zipfile
+        import io
+
+        self.client.login(username='alice', password='password123')
+        response = self.client.get(f'/workspace/{self.workspace_key}/export-zip/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/zip')
+
+        # Verify zip content
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, 'r') as zf:
+            namelist = zf.namelist()
+            self.assertIn('src/main.py', namelist)
+            file_content = zf.read('src/main.py').decode('utf-8')
+            self.assertIn('Hello Alice & Bob', file_content)
+
+    def test_parse_collab_command_file(self):
+        from .workspace_utils import parse_collab_command, extract_code_blocks
+        cmd = "/Collab file backend/server.py python: create a fastapi server"
+        target_type, path, instructions, lang = parse_collab_command(cmd)
+        self.assertEqual(target_type, 'file')
+        self.assertEqual(path, 'backend/server.py')
+        self.assertEqual(instructions, 'create a fastapi server')
+
+    def test_extract_code_blocks(self):
+        from .workspace_utils import extract_code_blocks
+        markdown_text = "Here is the code:\n```python:utils.py\ndef add(a, b):\n    return a + b\n```\nEnjoy!"
+        blocks = extract_code_blocks(markdown_text)
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(blocks[0]['language'], 'python')
+        self.assertIn('def add(a, b):', blocks[0]['content'])
+

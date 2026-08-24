@@ -9,7 +9,12 @@
                 <small>Code together in real-time</small>
             </div>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
+            {% if workspace_key %}
+            <a href="{% url 'chatapp:export_workspace_zip' workspace_key %}" class="btn btn-sm btn-outline-warning" id="workspace-export-zip-btn" title="Download entire project as ZIP">
+                <i class="bi bi-file-earmark-zip me-1"></i>ZIP
+            </a>
+            {% endif %}
             <button class="btn btn-sm btn-outline-light workspace-quick-create" data-workspace-create="python" title="New Python file" {% if not workspace_key %}disabled{% endif %}>.py</button>
             <button class="btn btn-sm btn-outline-light workspace-quick-create" data-workspace-create="html" title="New HTML file" {% if not workspace_key %}disabled{% endif %}>.html</button>
         </div>

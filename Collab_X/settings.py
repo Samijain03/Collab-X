@@ -50,6 +50,7 @@ CSRF_TRUSTED_ORIGINS = _csrf_origins or ['http://127.0.0.1:8000', 'http://localh
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'channels',
     'chatapp',
     'django.contrib.sites', 
@@ -111,12 +112,21 @@ WSGI_APPLICATION = 'Collab_X.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL') or f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600
-    )
-}
+db_url = os.environ.get('DATABASE_URL')
+if not db_url or (('dpg-' in db_url) and ('.render.com' not in db_url) and DEBUG):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+else:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=db_url,
+            conn_max_age=600
+        )
+    }
 
 
 # Password validation

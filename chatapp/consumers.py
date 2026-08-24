@@ -12,6 +12,8 @@ from .models import Message, Profile, Group, GroupMessage
 from .gemini_utils import format_chat_history, get_collab_response
 from .code_executor import execute_python_code
 
+from .workspace_utils import parse_collab_command, extract_code_blocks, apply_ai_code_to_workspace
+
 def parse_bot_response(response_text):
     """
     Parses the AI response to find a [jump_to: ID] tag.
@@ -32,9 +34,10 @@ def parse_bot_response(response_text):
 async def handle_collab_command_shared(consumer, command_text, is_hidden, default_query):
     """
     Shared handler for /Collab command in both ChatConsumer and GroupChatConsumer.
-    Reduces code duplication.
+    Supports chat summarization, answering questions, and auto-authoring code into the workspace.
     """
     request_id = f"bot-{consumer.user.id}-{int(time.time())}"
+    target_type, target_path, user_instructions, language = parse_collab_command(command_text)
     
     thinking_payload_js = {
         'type': 'bot_message',
@@ -57,12 +60,13 @@ async def handle_collab_command_shared(consumer, command_text, is_hidden, defaul
             'request_id': request_id
         })
     
-    if is_hidden:
-        user_query = command_text.replace('/Collab hidden', '').strip()
-    else:
-        user_query = command_text.replace('/Collab', '').strip()
-    if not user_query:
-        user_query = default_query
+    user_query = user_instructions if user_instructions else default_query
+    if target_type == 'file' and target_path:
+        user_query = (
+            f"Generate the complete, runnable code for the file '{target_path}'. "
+            f"Requirements: {user_instructions}. "
+            f"Format output with the complete code inside a ```{language or 'python'}:{target_path} code block."
+        )
         
     chat_history_string = await consumer.get_chat_history()
     
@@ -72,10 +76,55 @@ async def handle_collab_command_shared(consumer, command_text, is_hidden, defaul
     )
     clean_content, jump_id = parse_bot_response(bot_response_text)
     
+    # Auto-author into workspace if requested
+    created_notice = ""
+    if target_type == 'file' and target_path:
+        code_blocks = extract_code_blocks(bot_response_text)
+        if code_blocks:
+            code_content = code_blocks[0].get('content', '')
+            resolved_lang = code_blocks[0].get('language') or language
+            await database_sync_to_async(apply_ai_code_to_workspace)(
+                workspace_key=consumer.room_group_name,
+                user=consumer.user,
+                target_path=target_path,
+                content=code_content,
+                language=resolved_lang
+            )
+            created_notice = f"📁 **Auto-created `{target_path}` in Project Workspace!**\n\n"
+            
+            # Broadcast updated file tree to workspace clients
+            from .models import WorkspaceNode
+            @database_sync_to_async
+            def get_workspace_nodes():
+                nodes = WorkspaceNode.objects.filter(
+                    workspace_key=consumer.room_group_name
+                ).select_related('parent').order_by('node_type', 'name')
+                return [
+                    {
+                        'id': node.id,
+                        'name': node.name,
+                        'type': node.node_type,
+                        'parent_id': node.parent.id if node.parent else None,
+                        'language': node.language
+                    }
+                    for node in nodes
+                ]
+
+            updated_files = await get_workspace_nodes()
+            await consumer.channel_layer.group_send(
+                f'workspace_{consumer.room_group_name}',
+                {
+                    'type': 'send_file_list',
+                    'files': updated_files
+                }
+            )
+
+    final_content = f"{created_notice}{clean_content}"
+
     final_payload_js = {
         'type': 'bot_message',
         'status': 'complete',
-        'content': clean_content,
+        'content': final_content,
         'sender_username': 'Collab-X',
         'jump_id': jump_id,
         'request_id': request_id
@@ -87,7 +136,7 @@ async def handle_collab_command_shared(consumer, command_text, is_hidden, defaul
         await consumer.channel_layer.group_send(consumer.room_group_name, {
             'type': 'bot_message',
             'status': 'complete',
-            'message': clean_content,
+            'message': final_content,
             'sender_username': 'Collab-X',
             'jump_id': jump_id,
             'request_id': request_id
@@ -127,9 +176,30 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
+        
+        # Broadcast online presence
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'user_presence',
+                'user_id': self.user.id,
+                'username': self.user.username,
+                'status': 'online'
+            }
+        )
 
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
+            # Broadcast offline presence
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'user_presence',
+                    'user_id': self.user.id,
+                    'username': self.user.username,
+                    'status': 'offline'
+                }
+            )
             await self.channel_layer.group_discard(
                 self.room_group_name,
                 self.channel_name
@@ -154,6 +224,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 receiver=self.contact_user,
                 content=message_content
             )
+            sender_display_name = await self.get_sender_display_name(self.user)
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -161,10 +232,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'message_id': new_message.id, 
                     'message': new_message.content,
                     'sender_username': self.user.username,
+                    'sender_display_name': sender_display_name,
                     'timestamp': new_message.timestamp.strftime("%I:%M %p") 
                 }
             )
         
+        elif message_type == 'typing':
+            is_typing = data.get('is_typing', False)
+            sender_display_name = await self.get_sender_display_name(self.user)
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'user_typing',
+                    'user_id': self.user.id,
+                    'username': self.user.username,
+                    'display_name': sender_display_name,
+                    'is_typing': is_typing
+                }
+            )
+
         elif message_type == 'delete_message':
             message_id = data['message_id']
             deleted_message = await self.delete_message(message_id)
@@ -199,12 +285,30 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'timestamp': event['timestamp'],
         }))
 
+    async def user_typing(self, event):
+        if event.get('username') != self.user.username:
+            await self.send(text_data=json.dumps({
+                'type': 'user_typing',
+                'user_id': event['user_id'],
+                'username': event['username'],
+                'display_name': event.get('display_name'),
+                'is_typing': event['is_typing']
+            }))
+
+    async def user_presence(self, event):
+        if event.get('username') != self.user.username:
+            await self.send(text_data=json.dumps({
+                'type': 'user_presence',
+                'user_id': event['user_id'],
+                'username': event['username'],
+                'status': event['status']
+            }))
+
     async def message_deleted(self, event):
         await self.send(text_data=json.dumps({
             'type': 'message_deleted',
             'message_id': event['message_id'],
         }))
-
 
     async def bot_message(self, event):
         await self.send(text_data=json.dumps({
@@ -239,6 +343,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def save_message(self, sender, receiver, content):
         return Message.objects.create(sender=sender, receiver=receiver, content=content)
+    @database_sync_to_async
+    def get_sender_display_name(self, user):
+        return user.profile.display_name or user.username
     @database_sync_to_async
     def delete_message(self, message_id):
         try:
@@ -281,8 +388,29 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
         )
         await self.accept()
 
+        # Broadcast online presence to group
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'user_presence',
+                'user_id': self.user.id,
+                'username': self.user.username,
+                'status': 'online'
+            }
+        )
+
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
+            # Broadcast offline presence to group
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'user_presence',
+                    'user_id': self.user.id,
+                    'username': self.user.username,
+                    'status': 'offline'
+                }
+            )
             await self.channel_layer.group_discard(
                 self.room_group_name,
                 self.channel_name
@@ -321,6 +449,20 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
                 }
             )
             
+        elif message_type == 'typing':
+            is_typing = data.get('is_typing', False)
+            sender_display_name = await self.get_sender_display_name(self.user)
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'user_typing',
+                    'user_id': self.user.id,
+                    'username': self.user.username,
+                    'display_name': sender_display_name,
+                    'is_typing': is_typing
+                }
+            )
+
         elif message_type == 'delete_message':
             message_id = data['message_id']
             deleted_message = await self.delete_group_message(message_id)
@@ -354,6 +496,25 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             'attachment_name': event.get('attachment_name', ''),
             'timestamp': event['timestamp'],
         }))
+
+    async def user_typing(self, event):
+        if event.get('username') != self.user.username:
+            await self.send(text_data=json.dumps({
+                'type': 'user_typing',
+                'user_id': event['user_id'],
+                'username': event['username'],
+                'display_name': event.get('display_name'),
+                'is_typing': event['is_typing']
+            }))
+
+    async def user_presence(self, event):
+        if event.get('username') != self.user.username:
+            await self.send(text_data=json.dumps({
+                'type': 'user_presence',
+                'user_id': event['user_id'],
+                'username': event['username'],
+                'status': event['status']
+            }))
         
     async def message_deleted(self, event):
         await self.send(text_data=json.dumps({

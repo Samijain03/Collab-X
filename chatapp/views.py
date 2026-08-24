@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from asgiref.sync import async_to_sync
@@ -518,3 +518,54 @@ def upload_attachment_view(request, chat_type, chat_id):
         'attachment_url': message.file.url if message.file else '',
         'timestamp': timestamp,
     })
+
+
+@login_required
+def export_workspace_zip_view(request, workspace_key):
+    """Exports all files in the current workspace into a downloadable ZIP archive."""
+    import io
+    import zipfile
+    from .models import WorkspaceNode
+
+    user = request.user
+    has_access = False
+    
+    if workspace_key.startswith('chat_'):
+        parts = workspace_key.split('_')
+        if len(parts) == 3:
+            try:
+                user1_id = int(parts[1])
+                user2_id = int(parts[2])
+                if user.id in (user1_id, user2_id):
+                    has_access = True
+            except (ValueError, TypeError):
+                has_access = False
+    elif workspace_key.startswith('group_'):
+        parts = workspace_key.split('_')
+        if len(parts) == 2:
+            try:
+                group_id = int(parts[1])
+                has_access = Group.objects.filter(id=group_id, members=user).exists()
+            except (ValueError, TypeError):
+                has_access = False
+
+    if not has_access:
+        return HttpResponseForbidden("Access denied to this workspace.")
+
+    file_nodes = WorkspaceNode.objects.filter(
+        workspace_key=workspace_key,
+        node_type=WorkspaceNode.NodeType.FILE
+    ).select_related('parent')
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for node in file_nodes:
+            file_path = node.full_path
+            content = node.content or ''
+            zip_file.writestr(file_path, content)
+
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/zip')
+    filename = f"collab_workspace_{workspace_key}.zip"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response

@@ -76,10 +76,26 @@ Make sure you have the following installed on your system:
     Since this project uses Django Channels, it must be run with an ASGI server like `daphne` to handle both HTTP and WebSocket traffic.
 
     ```bash
-    daphne -p 8000 Collab-X.asgi:application
+    daphne -p 8000 Collab_X.asgi:application
     ```
 
 The application will be available at `http://127.0.0.1:8000/`.
+
+### Deployment on Render
+
+1. **Create a Web Service** connected to your repository.
+2. Set the following settings:
+   - **Environment**: `Python`
+   - **Build Command**: `./build.sh` (or `pip install -r requirements.txt && python manage.py collectstatic --no-input`)
+   - **Start Command**: `python manage.py migrate && daphne -b 0.0.0.0 -p $PORT Collab_X.asgi:application`
+3. Set the following **Environment Variables** in Render:
+   - `PYTHON_VERSION`: `3.12.3`
+   - `SECRET_KEY`: `<your-random-secret-key>`
+   - `DEBUG`: `False`
+   - `DATABASE_URL`: `<your-render-postgresql-internal-or-external-url>`
+   - `GOOGLE_GEMINI_API_KEY`: `<your-gemini-api-key>`
+   - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_STORAGE_BUCKET_NAME`, `AWS_S3_ENDPOINT_URL` (optional, for media uploads)
+   - `REDIS_URL`: `<your-render-redis-internal-url>` (optional, for multi-worker Channels)
 
 -----
 

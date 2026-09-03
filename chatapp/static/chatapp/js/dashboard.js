@@ -51,17 +51,14 @@
     function renderExistingMessages(chatMessages) {
         if (!chatMessages) return;
         chatMessages.querySelectorAll('.message-bubble').forEach(bubble => {
-            const p = bubble.querySelector('p');
-            if (p && !p.classList.contains('fst-italic') && !p.dataset.richRendered) {
-                const raw = p.textContent;
-                if (raw.includes('```') || raw.includes('`') || raw.includes('**') || raw.includes('* ') || raw.includes('#') || raw.includes('\n')) {
-                    const rich = renderRichContent(raw);
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'message-text-content';
-                    wrapper.innerHTML = rich;
-                    p.replaceWith(wrapper);
+            // Use message-text-content div (Django template renders raw text there)
+            const textContent = bubble.querySelector('.message-text-content');
+            if (textContent && !textContent.dataset.richRendered) {
+                const raw = textContent.textContent;
+                if (raw && (raw.includes('```') || raw.includes('`') || raw.includes('**') || raw.includes('* ') || raw.startsWith('#') || raw.includes('\n'))) {
+                    textContent.innerHTML = renderRichContent(raw);
                 }
-                p.dataset.richRendered = 'true';
+                textContent.dataset.richRendered = 'true';
             }
         });
     }
@@ -210,16 +207,28 @@
         input.dataset.bound = 'true';
     }
 
-    function setupMobileSidebar({ mobileToggle, mobileOverlay, sidebar }) {
+    function setupMobileSidebar({ mobileToggle, mobileOverlay, sidebar, workspacePanel }) {
         if (!mobileToggle || mobileToggle.dataset.bound === 'true' || !sidebar) return;
 
         mobileToggle.addEventListener('click', () => {
             sidebar.classList.toggle('show');
-            mobileOverlay?.classList.toggle('show');
+            workspacePanel?.classList.remove('mobile-show');
+            mobileOverlay?.classList.toggle('show', sidebar.classList.contains('show'));
         });
+
+        const mobileWsToggle = document.getElementById('mobileWorkspaceToggle');
+        if (mobileWsToggle && !mobileWsToggle.dataset.bound) {
+            mobileWsToggle.addEventListener('click', () => {
+                sidebar.classList.remove('show');
+                workspacePanel?.classList.toggle('mobile-show');
+                mobileOverlay?.classList.toggle('show', workspacePanel?.classList.contains('mobile-show'));
+            });
+            mobileWsToggle.dataset.bound = 'true';
+        }
 
         mobileOverlay?.addEventListener('click', () => {
             sidebar.classList.remove('show');
+            workspacePanel?.classList.remove('mobile-show');
             mobileOverlay.classList.remove('show');
         });
 
@@ -229,24 +238,42 @@
     function setupEmojiPicker({ emojiBtn, messageInput }) {
         if (!emojiBtn) return;
 
-        if (!window.EmojiButton) {
-            emojiBtn.disabled = true;
-            return;
+        const EMOJIS = ['😀','😂','😍','🥰','😎','🤔','😅','😭','🥳','🤩','😤','🙄','😴','🤯','😱','🎉','🚀','🔥','💡','✅','❌','⚡','💻','🎯','🐛','🔧','📝','📂','🌟','💬','👍','👎','👏','🤝','🙏','💯','🔑','🛡️','⚙️','🗂️','❤️','💙','💚','🖤','🤍','🌈','☀️','🌙','⭐','🎵'];
+
+        const panel = document.getElementById('emoji-panel');
+        const grid = document.getElementById('emoji-grid');
+        if (panel && grid && grid.children.length === 0) {
+            EMOJIS.forEach(emoji => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'emoji-item';
+                btn.textContent = emoji;
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (messageInput) {
+                        const pos = messageInput.selectionStart || messageInput.value.length;
+                        messageInput.value = messageInput.value.slice(0, pos) + emoji + messageInput.value.slice(pos);
+                        messageInput.setSelectionRange(pos + emoji.length, pos + emoji.length);
+                        messageInput.focus();
+                    }
+                    panel.classList.add('d-none');
+                });
+                grid.appendChild(btn);
+            });
         }
 
-        const picker = new EmojiButton({
-            position: 'top-end',
-            theme: 'dark'
+        emojiBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (panel) panel.classList.toggle('d-none');
         });
 
-        picker.on('emoji', selection => {
-            if (messageInput) {
-                messageInput.value += selection.emoji;
-                messageInput.focus();
+        // Close panel on outside click
+        document.addEventListener('click', (e) => {
+            if (panel && !panel.contains(e.target) && e.target !== emojiBtn) {
+                panel.classList.add('d-none');
             }
-        });
-
-        emojiBtn.addEventListener('click', () => picker.togglePicker(emojiBtn));
+        }, { capture: true });
     }
 
     function setupAttachmentUploads({ attachmentBtn, attachmentInput, attachmentStatus, uploadUrl, messageInput }) {
@@ -281,10 +308,12 @@
                 }
 
                 await response.json();
+                if (window.showToast) showToast('Attachment sent successfully!', 'success');
                 toggleAttachmentStatus(attachmentStatus, 'Attachment sent', 'success');
                 if (messageInput) messageInput.value = '';
             } catch (error) {
                 console.error(error);
+                if (window.showToast) showToast('Upload failed. Please try again.', 'error');
                 toggleAttachmentStatus(attachmentStatus, 'Upload failed', 'danger');
             } finally {
                 if (attachmentInput) attachmentInput.value = '';
@@ -328,54 +357,42 @@
         state.chatSocket.onclose = (event) => console.warn('Chat socket closed', event.reason);
     }
 
+    // ── Configure marked once at startup ───────────────────
+    (function setupMarked() {
+        if (!window.marked) return;
+        const renderer = new marked.Renderer();
+        renderer.code = function(code, language) {
+            let highlighted = '';
+            const lang = (language || '').trim();
+            if (window.hljs) {
+                try {
+                    highlighted = lang && hljs.getLanguage(lang)
+                        ? hljs.highlight(code, { language: lang }).value
+                        : hljs.highlightAuto(code).value;
+                } catch (e) {
+                    highlighted = code;
+                }
+            } else {
+                highlighted = code;
+            }
+            return `<div class="code-block-wrapper"><pre><code class="hljs language-${lang}">${highlighted}</code></pre><button type="button" class="code-copy-btn"><i class="bi bi-clipboard me-1"></i>Copy</button></div>`;
+        };
+        marked.use({
+            renderer,
+            gfm: true,
+            breaks: true
+        });
+    })();
+
     function renderRichContent(rawText) {
         if (!rawText) return '';
         if (window.marked) {
             try {
-                marked.setOptions({
-                    gfm: true,
-                    breaks: true,
-                    highlight: function(code, lang) {
-                        if (window.hljs && lang && hljs.getLanguage(lang)) {
-                            try {
-                                return hljs.highlight(code, { language: lang }).value;
-                            } catch (err) {}
-                        }
-                        if (window.hljs) {
-                            try {
-                                return hljs.highlightAuto(code).value;
-                            } catch (err) {}
-                        }
-                        return code;
-                    }
-                });
                 const html = marked.parse(rawText);
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = html;
-                tempDiv.querySelectorAll('pre').forEach(pre => {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'code-block-wrapper';
-                    const copyBtn = document.createElement('button');
-                    copyBtn.className = 'code-copy-btn';
-                    copyBtn.type = 'button';
-                    copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
-                    copyBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        const code = pre.querySelector('code')?.innerText || pre.innerText;
-                        navigator.clipboard.writeText(code).then(() => {
-                            copyBtn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
-                            setTimeout(() => {
-                                copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
-                            }, 2000);
-                        });
-                    });
-                    pre.parentNode.insertBefore(wrapper, pre);
-                    wrapper.appendChild(pre);
-                    wrapper.appendChild(copyBtn);
-                });
-                return tempDiv.innerHTML;
+                // Wire up copy buttons after inserting into DOM (event delegation handles it)
+                return html;
             } catch (e) {
-                console.warn("Markdown rendering failed", e);
+                console.warn('Markdown rendering failed', e);
             }
         }
         const div = document.createElement('div');
@@ -421,6 +438,7 @@
         }
     }
 
+    let typingHideTimer = null;
     function handleUserTyping(data) {
         const typingIndicator = document.getElementById('typing-indicator');
         const typingText = document.getElementById('typing-text');
@@ -432,7 +450,13 @@
             typingIndicator.classList.remove('d-none');
             const container = state.chatUI?.chatMessages;
             if (container) scrollToBottom(container);
+
+            clearTimeout(typingHideTimer);
+            typingHideTimer = setTimeout(() => {
+                typingIndicator.classList.add('d-none');
+            }, 3500);
         } else {
+            clearTimeout(typingHideTimer);
             typingIndicator.classList.add('d-none');
         }
     }
@@ -566,11 +590,27 @@
                     target.classList.add('highlight');
                     setTimeout(() => target.classList.remove('highlight'), 2000);
                 } else {
-                    alert('Message not found in current view');
+                    if (window.showToast) showToast('Message not found in current view', 'warning');
+                    else alert('Message not found in current view');
+                }
+            }
+
+            // Code copy button (event delegation for dynamically inserted content)
+            const copyBtn = event.target.closest('.code-copy-btn');
+            if (copyBtn) {
+                event.preventDefault();
+                const pre = copyBtn.closest('.code-block-wrapper')?.querySelector('pre');
+                const code = pre?.querySelector('code')?.innerText || pre?.innerText || '';
+                if (navigator.clipboard && code) {
+                    navigator.clipboard.writeText(code).then(() => {
+                        copyBtn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
+                        setTimeout(() => { copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy'; }, 2000);
+                    });
                 }
             }
         });
     }
+
 
     function buildWorkspaceTree(nodes) {
         const nodeMap = new Map();
@@ -1034,11 +1074,23 @@
             });
         }
         
+        function updateStatusBarCursor(editor) {
+            const statusCursor = document.getElementById('workspace-status-cursor');
+            if (!statusCursor || !editor) return;
+            const val = editor.value.substring(0, editor.selectionStart);
+            const lines = val.split('\n');
+            const lineNum = lines.length;
+            const colNum = lines[lines.length - 1].length + 1;
+            statusCursor.textContent = `Ln ${lineNum}, Col ${colNum}`;
+        }
+
         function sendCursorUpdate() {
             if (!state.activeWorkspaceNode || !state.workspaceSocket || state.workspaceIsApplyingRemote) return;
             const { workspaceEditor } = state.workspaceUI || {};
             if (!workspaceEditor || workspaceEditor.disabled) return;
             
+            updateStatusBarCursor(workspaceEditor);
+
             state.workspaceSocket.send(JSON.stringify({
                 type: 'cursor_update',
                 node_id: state.activeWorkspaceNode,
@@ -1150,6 +1202,10 @@
             workspaceLangBadge.textContent = (node.language || 'text').toUpperCase();
             workspaceLangBadge.classList.remove('d-none');
         }
+        const statusLang = document.getElementById('workspace-status-lang');
+        if (statusLang) statusLang.textContent = (node.language || 'text').toUpperCase();
+        const statusCursor = document.getElementById('workspace-status-cursor');
+        if (statusCursor) statusCursor.textContent = 'Ln 1, Col 1';
         [workspaceRunBtn, workspaceDownloadBtn, workspaceRenameBtn, workspaceDeleteBtn].forEach(btn => {
             if (btn) btn.disabled = false;
         });
@@ -1195,6 +1251,10 @@
         }
         if (workspaceActive) workspaceActive.textContent = 'Select a file';
         if (workspaceLangBadge) workspaceLangBadge.classList.add('d-none');
+        const statusLang = document.getElementById('workspace-status-lang');
+        if (statusLang) statusLang.textContent = '—';
+        const statusCursor = document.getElementById('workspace-status-cursor');
+        if (statusCursor) statusCursor.textContent = 'Ln 1, Col 1';
         [workspaceRunBtn, workspaceDownloadBtn, workspaceRenameBtn, workspaceDeleteBtn].forEach(btn => {
             if (btn) btn.disabled = true;
         });
@@ -1265,11 +1325,14 @@
         }
 
         if (isSent) {
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'msg-actions';
             const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn btn-danger btn-sm delete-msg-btn float-end';
+            deleteBtn.className = 'btn btn-danger btn-sm delete-msg-btn';
             deleteBtn.title = 'Delete message';
             deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-            bubble.appendChild(deleteBtn);
+            actionsDiv.appendChild(deleteBtn);
+            bubble.appendChild(actionsDiv);
         }
 
         const time = document.createElement('span');

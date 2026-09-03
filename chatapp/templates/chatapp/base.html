@@ -439,6 +439,64 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--primary-light);
         }
+
+        /* ── Global Toast Notifications ─────────────────── */
+        #toast-container {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 11000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            pointer-events: none;
+        }
+        .cx-toast {
+            pointer-events: all;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.75rem;
+            border: 1px solid;
+            font-size: 0.9rem;
+            font-family: 'JetBrains Mono', monospace;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            animation: toastIn 0.3s cubic-bezier(0.4,0,0.2,1) forwards;
+            max-width: 340px;
+        }
+        .cx-toast.toast-success {
+            background: rgba(0,255,159,0.12);
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        .cx-toast.toast-error {
+            background: rgba(255,0,110,0.12);
+            border-color: var(--danger-color);
+            color: var(--danger-color);
+        }
+        .cx-toast.toast-info {
+            background: rgba(0,212,255,0.12);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        .cx-toast.toast-warning {
+            background: rgba(255,189,46,0.12);
+            border-color: var(--warning-color);
+            color: var(--warning-color);
+        }
+        .cx-toast.toast-out {
+            animation: toastOut 0.3s ease forwards;
+        }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(60px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateX(0); }
+            to   { opacity: 0; transform: translateX(60px); }
+        }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -458,7 +516,11 @@
                     {% if user.is_authenticated %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <img src="{{ user.profile.profile_picture.url }}" alt="Profile" class="rounded-circle">
+                                {% if user.profile.profile_picture %}
+                                    <img src="{{ user.profile.profile_picture.url }}" alt="Profile" class="rounded-circle">
+                                {% else %}
+                                    <span class="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold" style="width:38px;height:38px;background:linear-gradient(135deg,var(--primary-color),var(--accent-cyan));color:var(--darker-bg);font-size:1rem;">{{ user.username|first|upper }}</span>
+                                {% endif %}
                                 <span class="d-none d-md-inline">{{ user.profile.display_name|default:user.username }}</span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
@@ -521,7 +583,32 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     {% block extra_js %}{% endblock %}
 
+    <!-- Global toast container -->
+    <div id="toast-container"></div>
+
     <script>
+        // ── Global Toast Notification API ─────────────────
+        window.showToast = function(message, type = 'info', duration = 3500) {
+            const iconMap = {
+                success: 'bi-check-circle-fill',
+                error: 'bi-x-circle-fill',
+                info: 'bi-info-circle-fill',
+                warning: 'bi-exclamation-triangle-fill'
+            };
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = `cx-toast toast-${type}`;
+            toast.innerHTML = `<i class="bi ${iconMap[type] || 'bi-info-circle-fill'}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            const dismiss = () => {
+                toast.classList.add('toast-out');
+                toast.addEventListener('animationend', () => toast.remove(), { once: true });
+            };
+            setTimeout(dismiss, duration);
+            toast.addEventListener('click', dismiss);
+        };
+
         document.addEventListener('DOMContentLoaded', function() {
             const profilePicModal = document.getElementById('profilePicModal');
             const modalImage = document.getElementById('modalProfilePicImage');

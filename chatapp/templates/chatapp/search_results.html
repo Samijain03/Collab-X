@@ -319,23 +319,42 @@
                     </div>
 
                     <ul class="user-list">
-                        {% for user in results %}
+                        {% for found_user in results %}
                         <li class="user-item">
                             <div class="user-info-wrapper">
-                                <img src="{{ user.profile.profile_picture.url }}" 
-                                     alt="{{ user.profile.display_name|default:user.username }}" 
+                                {% if found_user.profile.profile_picture %}
+                                <img src="{{ found_user.profile.profile_picture.url }}" 
+                                     alt="{{ found_user.profile.display_name|default:found_user.username }}" 
                                      class="user-avatar">
+                                {% else %}
+                                <span class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold flex-shrink-0" style="width:60px;height:60px;background:linear-gradient(135deg,var(--primary-color),var(--accent-cyan));color:var(--darker-bg);font-size:1.5rem;">{{ found_user.username|first|upper }}</span>
+                                {% endif %}
                                 <div class="user-details">
-                                    <h5>{{ user.profile.display_name|default:user.username }}</h5>
+                                    <h5>{{ found_user.profile.display_name|default:found_user.username }}</h5>
                                     <small>
-                                        <i class="bi bi-at"></i>{{ user.username }}
+                                        <i class="bi bi-at"></i>{{ found_user.username }}
                                     </small>
+                                    {% if found_user.profile.about_me %}
+                                    <p class="text-muted small mb-0 mt-1" style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ found_user.profile.about_me }}</p>
+                                    {% endif %}
                                 </div>
                             </div>
-                            <a href="{% url 'chatapp:send_contact_request' user.id %}" class="add-contact-btn">
-                                <i class="bi bi-person-plus-fill"></i>
-                                Send Request
-                            </a>
+                            <div class="action-slot">
+                                {% if found_user.id in existing_contact_ids %}
+                                    <a href="{% url 'chatapp:dashboard_chat' found_user.id %}" class="btn btn-outline-success btn-sm d-flex align-items-center gap-1">
+                                        <i class="bi bi-chat-dots-fill"></i> Chat
+                                    </a>
+                                {% elif found_user.id in sent_request_ids %}
+                                    <span class="badge bg-secondary p-2 d-flex align-items-center gap-1">
+                                        <i class="bi bi-clock-history"></i> Request Pending
+                                    </span>
+                                {% else %}
+                                    <button type="button" class="add-contact-btn send-req-btn" data-user-id="{{ found_user.id }}" data-username="{{ found_user.username }}">
+                                        <i class="bi bi-person-plus-fill"></i>
+                                        Send Request
+                                    </button>
+                                {% endif %}
+                            </div>
                         </li>
                         {% endfor %}
                     </ul>
@@ -360,4 +379,46 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.send-req-btn').forEach(btn => {
+            btn.addEventListener('click', async function (e) {
+                e.preventDefault();
+                const userId = this.dataset.userId;
+                const username = this.dataset.username;
+                const parentSlot = this.closest('.action-slot');
+                
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Sending...';
+
+                try {
+                    const res = await fetch(`/contacts/request/${userId}/`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success' || data.status === 'info') {
+                        if (window.showToast) {
+                            showToast(data.message, data.status === 'success' ? 'success' : 'info');
+                        }
+                        parentSlot.innerHTML = `<span class="badge bg-secondary p-2 d-flex align-items-center gap-1"><i class="bi bi-clock-history"></i> Request Pending</span>`;
+                    } else {
+                        if (window.showToast) {
+                            showToast(data.message || 'Could not send request', 'error');
+                        }
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-person-plus-fill"></i> Send Request';
+                    }
+                } catch (err) {
+                    // Fallback to normal redirect if needed
+                    window.location.href = `/contacts/request/${userId}/`;
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}

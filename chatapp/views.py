@@ -79,12 +79,23 @@ def logout_view(request):
 def dashboard_view(request, contact_id=None, group_id=None):
     # Optimize: Use select_related to avoid N+1 queries
     profile = request.user.profile
-    contacts_profiles = profile.contacts.select_related('user').all()
-    user_groups = request.user.chat_groups.prefetch_related('members', 'creator').all()
+    contacts_profiles = list(profile.contacts.select_related('user').all())
+    user_groups = list(request.user.chat_groups.prefetch_related('members', 'creator').all())
     incoming_requests = ContactRequest.objects.filter(
         to_user=request.user
     ).select_related('from_user', 'from_user__profile')
     
+    # Attach last message preview for contacts
+    for c in contacts_profiles:
+        c.last_message = Message.objects.filter(
+            (Q(sender=request.user) & Q(receiver=c.user)) |
+            (Q(sender=c.user) & Q(receiver=request.user))
+        ).order_by('-timestamp').first()
+
+    # Attach last message preview for groups
+    for g in user_groups:
+        g.last_message = g.messages.order_by('-timestamp').first()
+
     context = {
         'contacts': contacts_profiles,
         'groups': user_groups,
@@ -174,12 +185,18 @@ def dashboard_view(request, contact_id=None, group_id=None):
 def search_users_view(request):
     query = request.GET.get('q', '').strip()
     results = []
+    existing_contact_ids = set(request.user.profile.contacts.values_list('user__id', flat=True))
+    sent_request_ids = set(ContactRequest.objects.filter(from_user=request.user).values_list('to_user__id', flat=True))
     if query:
         # Optimize: Use select_related and search both username and display name
         results = User.objects.filter(
             Q(username__icontains=query) | Q(profile__display_name__icontains=query)
         ).select_related('profile').exclude(id=request.user.id).distinct()[:50]
-    context = {'results': results}
+    context = {
+        'results': results,
+        'existing_contact_ids': existing_contact_ids,
+        'sent_request_ids': sent_request_ids,
+    }
     return render(request, 'chatapp/search_results.html', context)
 
 @login_required

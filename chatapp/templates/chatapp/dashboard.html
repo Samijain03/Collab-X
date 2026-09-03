@@ -332,8 +332,14 @@
     }
 
     .workspace-panel.collapsed .workspace-body,
-    .workspace-panel.collapsed .workspace-header .d-flex {
+    .workspace-panel.collapsed .workspace-header .d-flex,
+    .workspace-panel.collapsed .workspace-header-title > div {
         display: none !important;
+    }
+
+    .workspace-panel.collapsed .workspace-header {
+        padding: 1rem 0.5rem;
+        justify-content: center;
     }
 
     .workspace-header-title {
@@ -1240,6 +1246,41 @@
         .workspace-panel {
             display: none;
         }
+
+        .workspace-panel.mobile-show {
+            display: flex !important;
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 88vw;
+            max-width: 380px;
+            z-index: 1050;
+            box-shadow: -4px 0 24px rgba(0, 0, 0, 0.7);
+        }
+
+        .mobile-workspace-toggle {
+            position: fixed;
+            bottom: 5.5rem;
+            right: 1.5rem;
+            width: 3.25rem;
+            height: 3.25rem;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            border: none;
+            color: white;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+            z-index: 1040;
+            transition: transform 0.2s ease;
+        }
+
+        .mobile-workspace-toggle:hover {
+            transform: scale(1.08);
+        }
     }
 
     /* Section Headers */
@@ -1398,6 +1439,80 @@
         min-height: 100px;
         border: 1px solid #333;
     }
+
+    /* ── msg-actions (delete button wrapper) ─────────── */
+    .msg-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 0.25rem;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .message-bubble.sent:hover .msg-actions {
+        opacity: 1;
+    }
+
+    /* ── Emoji Picker Panel ───────────────────────────── */
+    .emoji-panel {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 0;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 0.5rem;
+        z-index: 1000;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        width: 280px;
+        animation: slideDown 0.2s ease-out;
+    }
+
+    .emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+        max-height: 180px;
+        overflow-y: auto;
+    }
+
+    .emoji-item {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        border-radius: 0.375rem;
+        padding: 4px;
+        line-height: 1;
+        transition: background 0.15s ease;
+    }
+
+    .emoji-item:hover {
+        background: rgba(0,255,159,0.15);
+    }
+
+    .chat-input {
+        position: relative;
+    }
+
+    /* ── Workspace Status Bar ─────────────────────────── */
+    .workspace-statusbar {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.3rem 0.75rem;
+        background: rgba(0,0,0,0.25);
+        border-top: 1px solid var(--border-color);
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        font-family: 'Fira Code', monospace;
+    }
+
+    .workspace-statusbar span {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
 </style>
 {% endblock %}
 
@@ -1451,14 +1566,26 @@
             </div>
             {% for contact in contacts %}
             <a href="{% url 'chatapp:dashboard_chat' contact.user.id %}"
-                class="contact-item {% if selected_contact and selected_contact.user.id == contact.user.id %}active{% endif %}">
-                <div class="profile-pic-clickable">
-                    <img src="{{ contact.profile_picture.url }}"
-                        alt="{{ contact.display_name|default:contact.user.username }}">
+                class="contact-item {% if selected_contact and selected_contact.user.id == contact.user.id %}active{% endif %}"
+                data-username="{{ contact.user.username }}">
+                <div class="profile-pic-clickable position-relative">
+                    {% if contact.profile_picture %}
+                        <img src="{{ contact.profile_picture.url }}"
+                            alt="{{ contact.display_name|default:contact.user.username }}">
+                    {% else %}
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold flex-shrink-0" style="width:56px;height:56px;background:linear-gradient(135deg,#00ff9f,#00d4ff);color:#010409;font-size:1.25rem;border:2px solid #00ff9f;">{{ contact.user.username|first|upper }}</span>
+                    {% endif %}
+                    <span class="user-status-dot offline position-absolute" style="bottom:2px;right:2px;border:2px solid var(--card-bg);"></span>
                 </div>
                 <div class="contact-info">
                     <h6>{{ contact.display_name|default:contact.user.username }}</h6>
-                    <small>@{{ contact.user.username }}</small>
+                    {% if contact.last_message %}
+                        <small class="text-truncate d-block" style="max-width: 175px; opacity: 0.85;">
+                            {% if contact.last_message.sender == user %}You: {% endif %}{{ contact.last_message.content|truncatechars:26 }}
+                        </small>
+                    {% else %}
+                        <small>@{{ contact.user.username }}</small>
+                    {% endif %}
                 </div>
             </a>
             {% empty %}
@@ -1493,7 +1620,13 @@
                 <div class="group-icon">{{ group.name|first|upper }}</div>
                 <div class="contact-info">
                     <h6>{{ group.name }}</h6>
-                    <small>{{ group.members.count }} member{{ group.members.count|pluralize }}</small>
+                    {% if group.last_message %}
+                        <small class="text-truncate d-block" style="max-width: 175px; opacity: 0.85;">
+                            {{ group.last_message.sender.username }}: {{ group.last_message.content|truncatechars:22 }}
+                        </small>
+                    {% else %}
+                        <small>{{ group.members.count }} member{{ group.members.count|pluralize }}</small>
+                    {% endif %}
                 </div>
             </a>
             {% empty %}
@@ -1529,299 +1662,19 @@
     </div>
 </div>
 
-<button class="mobile-toggle d-md-none" id="mobileToggle">
+<button class="mobile-toggle d-md-none" id="mobileToggle" title="Toggle Sidebar">
     <i class="bi bi-list"></i>
+</button>
+<button class="mobile-workspace-toggle d-md-none" id="mobileWorkspaceToggle" title="Toggle Workspace">
+    <i class="bi bi-code-slash"></i>
 </button>
 <div class="mobile-overlay" id="mobileOverlay"></div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const chatMessages = document.getElementById('chat-messages');
-        const chatForm = document.getElementById('chat-form');
-        const messageInput = document.getElementById('message-input');
-        const mobileToggle = document.getElementById('mobileToggle');
-        const mobileOverlay = document.getElementById('mobileOverlay');
-        const sidebar = document.getElementById('sidebar');
-
-        // Code Panel Elements
-        const codePanel = document.getElementById('code-panel');
-        const toggleCodeBtn = document.getElementById('toggle-code-panel');
-        const closeCodeBtn = document.getElementById('close-code-panel');
-        const runCodeBtn = document.getElementById('run-code-btn');
-        const codeInput = document.getElementById('code-input');
-        const codeOutput = document.getElementById('code-output');
-
-        let chatSocket = null;
-
-        // Scroll to bottom
-        if (chatMessages) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // Mobile sidebar toggle
-        if (mobileToggle) {
-            mobileToggle.addEventListener('click', function () {
-                sidebar.classList.toggle('show');
-                mobileOverlay.classList.toggle('show');
-            });
-
-            mobileOverlay.addEventListener('click', function () {
-                sidebar.classList.remove('show');
-                mobileOverlay.classList.remove('show');
-            });
-        }
-
-        // Code Panel Toggle Logic
-        if (toggleCodeBtn && codePanel) {
-            toggleCodeBtn.addEventListener('click', function () {
-                codePanel.classList.toggle('open');
-            });
-        }
-
-        if (closeCodeBtn && codePanel) {
-            closeCodeBtn.addEventListener('click', function () {
-                codePanel.classList.remove('open');
-            });
-        }
-
-        // WebSocket setup
-        const chatType = "{{ chat_type|default:'' }}";
-        const chatId = "{{ chat_id|default:'' }}";
-        const currentUsername = "{{ user.username }}";
-        window.currentUserId = {{ user.id }};
-
-        if (chatType && chatId) {
-            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = chatType === '1on1'
-                ? `${wsProtocol}//${window.location.host}/ws/chat/${chatId}/`
-                : `${wsProtocol}//${window.location.host}/ws/group/${chatId}/`;
-
-            chatSocket = new WebSocket(wsUrl);
-
-            chatSocket.onmessage = function (e) {
-                const data = JSON.parse(e.data);
-
-                if (data.type === 'chat_message') {
-                    const isSent = data.sender_username === currentUsername;
-                    const bubble = createMessageBubble(
-                        data.content,
-                        data.timestamp,
-                        isSent,
-                        chatType === 'group' ? data.sender_display_name : null,
-                        data.message_id
-                    );
-                    chatMessages.appendChild(bubble);
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                }
-                else if (data.type === 'message_deleted') {
-                    const bubble = document.querySelector(`.message-bubble[data-message-id='${data.message_id}']`);
-                    if (bubble) {
-                        bubble.innerHTML = `
-                        <p class="fst-italic" style="opacity: 0.7;">This message was deleted.</p>
-                        <span class="message-time"></span>
-                    `;
-                    }
-                }
-                else if (data.type === 'bot_message') {
-                    if (data.status === 'thinking') {
-                        const bubble = createBotMessageBubble(data.content, data.sender_username, null, data.request_id);
-                        chatMessages.appendChild(bubble);
-                    } else if (data.status === 'complete') {
-                        const existingBubble = document.getElementById(`bot-response-${data.request_id}`);
-                        if (existingBubble) {
-                            const contentP = existingBubble.querySelector(`#bot-content-${data.request_id}`);
-                            if (contentP) contentP.textContent = data.content;
-
-                            if (data.jump_id) {
-                                const jumpContainer = existingBubble.querySelector(`#bot-jump-${data.request_id}`);
-                                if (jumpContainer) {
-                                    jumpContainer.innerHTML = '';
-                                    const jumpBtn = document.createElement('button');
-                                    jumpBtn.className = 'jump-btn';
-                                    jumpBtn.textContent = 'Jump to message';
-                                    jumpBtn.dataset.jumpId = data.jump_id;
-                                    jumpContainer.appendChild(jumpBtn);
-                                }
-                            }
-                        }
-                    }
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                }
-                else if (data.type === 'execution_result') {
-                    if (codeOutput) {
-                        codeOutput.textContent = data.output;
-                    }
-                }
-            };
-
-            chatSocket.onclose = function (e) {
-                console.error('WebSocket closed', e);
-            };
-        }
-
-        // Send message
-        if (chatForm) {
-            chatForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                const message = messageInput.value.trim();
-                if (message && chatSocket) {
-                    chatSocket.send(JSON.stringify({
-                        type: 'chat_message',
-                        message: message
-                    }));
-                    messageInput.value = '';
-                }
-            });
-        }
-
-        // Run Code Logic
-        if (runCodeBtn && codeInput && chatSocket) {
-            runCodeBtn.addEventListener('click', function () {
-                const code = codeInput.value;
-                if (!code.trim()) return;
-
-                codeOutput.textContent = "Running...";
-
-                // Ensure socket is open
-                if (chatSocket.readyState === WebSocket.OPEN) {
-                    chatSocket.send(JSON.stringify({
-                        type: 'execute_code',
-                        code: code
-                    }));
-                } else {
-                    codeOutput.textContent = "Error: Connection lost. Refresh page.";
-                }
-            });
-        }
-
-        // Delete and jump handlers
-        if (chatMessages) {
-            chatMessages.addEventListener('click', function (e) {
-                const deleteButton = e.target.closest('.delete-msg-btn');
-                if (deleteButton) {
-                    e.preventDefault();
-                    const messageBubble = deleteButton.closest('.message-bubble');
-                    const messageId = messageBubble.dataset.messageId;
-
-                    if (confirm('Delete this message?')) {
-                        if (chatSocket && messageId) {
-                            chatSocket.send(JSON.stringify({
-                                type: 'delete_message',
-                                message_id: messageId
-                            }));
-                        }
-                    }
-                }
-
-                const jumpButton = e.target.closest('.jump-btn');
-                if (jumpButton) {
-                    e.preventDefault();
-                    const jumpId = jumpButton.dataset.jumpId;
-                    const targetMessage = document.querySelector(`.message-bubble[data-message-id='${jumpId}']`);
-
-                    if (targetMessage) {
-                        targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        targetMessage.classList.add('highlight');
-                        setTimeout(() => targetMessage.classList.remove('highlight'), 2000);
-                    } else {
-                        alert("Message not found in current view");
-                    }
-                }
-            });
-        }
-
-        // Create message bubble
-        function createMessageBubble(content, timestamp, isSent, senderDisplayName, messageId) {
-            const bubble = document.createElement('div');
-            bubble.className = `message-bubble ${isSent ? 'sent' : 'received'}`;
-            bubble.dataset.messageId = messageId;
-
-            if (senderDisplayName && !isSent) {
-                const sender = document.createElement('small');
-                sender.className = 'fw-bold d-block mb-1';
-                sender.style.color = 'var(--primary-light)';
-                sender.textContent = senderDisplayName;
-                bubble.appendChild(sender);
-            }
-
-            const content_p = document.createElement('p');
-            content_p.textContent = content;
-            bubble.appendChild(content_p);
-
-            if (isSent) {
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-danger btn-sm delete-msg-btn float-end';
-                deleteBtn.title = 'Delete message';
-                deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-                bubble.appendChild(deleteBtn);
-            }
-
-            const time = document.createElement('span');
-            time.className = 'message-time';
-            time.textContent = timestamp;
-            bubble.appendChild(time);
-
-            return bubble;
-        }
-
-        // Create bot message bubble
-        function createBotMessageBubble(content, senderUsername, jumpId, requestId) {
-            const bubble = document.createElement('div');
-            bubble.className = 'message-bubble bot';
-            bubble.id = `bot-response-${requestId}`;
-
-            const avatar = document.createElement('img');
-            avatar.className = 'bot-avatar';
-            avatar.src = "{% static 'chatapp/images/bot_avatar.png' %}";
-            avatar.alt = 'Bot';
-            bubble.appendChild(avatar);
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'bot-content-wrapper';
-
-            const header = document.createElement('div');
-            header.className = 'bot-header';
-            header.innerHTML = `<i class="bi bi-robot"></i>${senderUsername}`;
-            wrapper.appendChild(header);
-
-            const contentP = document.createElement('p');
-            contentP.id = `bot-content-${requestId}`;
-            contentP.textContent = content;
-            wrapper.appendChild(contentP);
-
-            const jumpContainer = document.createElement('div');
-            jumpContainer.id = `bot-jump-${requestId}`;
-            if (jumpId) {
-                const jumpBtn = document.createElement('button');
-                jumpBtn.className = 'jump-btn';
-                jumpBtn.textContent = 'Jump to message';
-                jumpBtn.dataset.jumpId = jumpId;
-                jumpContainer.appendChild(jumpBtn);
-            }
-            wrapper.appendChild(jumpContainer);
-
-            bubble.appendChild(wrapper);
-            return bubble;
-        }
-
-        // Search filter
-        const searchInput = document.getElementById('contact-search-input');
-        if (searchInput) {
-            searchInput.addEventListener('input', function () {
-                const filter = this.value.toLowerCase();
-                const items = document.querySelectorAll('.contact-list .contact-item');
-
-                items.forEach(function (item) {
-                    const name = item.querySelector('.contact-info h6')?.textContent.toLowerCase() || '';
-                    const username = item.querySelector('.contact-info small')?.textContent.toLowerCase() || '';
-                    const text = name + username;
-
-                    item.style.display = text.includes(filter) ? 'flex' : 'none';
-                });
-            });
-        }
-    });
+    // Expose current user ID for collaborative editing
+    window.currentUserId = {{ user.id }};
 </script>
+<script src="{% static 'chatapp/js/dashboard.js' %}"></script>
 {% endblock %}

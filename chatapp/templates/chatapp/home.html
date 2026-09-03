@@ -84,6 +84,16 @@
         font-family: 'JetBrains Mono', monospace;
     }
 
+    .typewriter-cursor {
+        animation: blink 0.7s infinite;
+        color: var(--primary-color);
+        font-weight: bold;
+    }
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+    }
+
     .hero-buttons {
         display: flex;
         gap: 1rem;
@@ -241,7 +251,13 @@
                     <i class="bi bi-terminal-fill"></i>
                 </div>
                 <h1>Welcome to Collab-X</h1>
-                <p>// Connect, code, collaborate in real-time</p>
+                <p class="hero-tagline">// <span id="typewriter-text">Connect, code, collaborate in real-time.</span><span class="typewriter-cursor">|</span></p>
+                <div class="d-flex justify-content-center gap-2 mb-4 flex-wrap">
+                    <span class="badge" style="background:rgba(0,255,159,0.12);border:1px solid var(--primary-color);color:var(--primary-color);padding:0.4rem 0.75rem;font-family:'Fira Code',monospace;"><i class="bi bi-lightning-charge me-1"></i>WebSockets</span>
+                    <span class="badge" style="background:rgba(0,212,255,0.12);border:1px solid var(--accent-cyan);color:var(--accent-cyan);padding:0.4rem 0.75rem;font-family:'Fira Code',monospace;"><i class="bi bi-robot me-1"></i>Gemini AI</span>
+                    <span class="badge" style="background:rgba(189,0,255,0.12);border:1px solid var(--accent-purple);color:var(--accent-purple);padding:0.4rem 0.75rem;font-family:'Fira Code',monospace;"><i class="bi bi-folder-check me-1"></i>Live Workspace</span>
+                    <span class="badge" style="background:rgba(255,189,46,0.12);border:1px solid var(--warning-color);color:var(--warning-color);padding:0.4rem 0.75rem;font-family:'Fira Code',monospace;"><i class="bi bi-play-circle me-1"></i>Code Execution</span>
+                </div>
                 
                 <div class="hero-buttons">
                     {% if user.is_authenticated %}
@@ -305,4 +321,45 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const phrases = [
+            "Connect, code, collaborate in real-time.",
+            "AI-powered multi-user code workspace.",
+            "Run Python and render HTML live.",
+            "Chat with peers and AI side-by-side."
+        ];
+        const el = document.getElementById('typewriter-text');
+        if (!el) return;
+        let phraseIdx = 0;
+        let charIdx = 0;
+        let isDeleting = false;
+
+        function type() {
+            const current = phrases[phraseIdx];
+            if (isDeleting) {
+                el.textContent = current.substring(0, charIdx - 1);
+                charIdx--;
+            } else {
+                el.textContent = current.substring(0, charIdx + 1);
+                charIdx++;
+            }
+
+            let speed = isDeleting ? 25 : 55;
+            if (!isDeleting && charIdx === current.length) {
+                speed = 2200;
+                isDeleting = true;
+            } else if (isDeleting && charIdx === 0) {
+                isDeleting = false;
+                phraseIdx = (phraseIdx + 1) % phrases.length;
+                speed = 400;
+            }
+            setTimeout(type, speed);
+        }
+        setTimeout(type, 1000);
+    });
+</script>
 {% endblock %}

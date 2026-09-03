@@ -217,7 +217,12 @@
                 
                 <div class="text-center mb-4">
                     <label for="{{ form.profile_picture.id_for_label }}" class="profile-picture-container">
-                        <img id="profile-pic-preview" src="{{ user.profile.profile_picture.url }}" alt="Profile Picture">
+                        {% if user.profile.profile_picture %}
+                            <img id="profile-pic-preview" src="{{ user.profile.profile_picture.url }}" alt="Profile Picture">
+                        {% else %}
+                            <span id="profile-pic-fallback" class="d-flex align-items-center justify-content-center rounded-circle fw-bold w-100 h-100" style="background:linear-gradient(135deg,var(--primary-color),var(--accent-cyan));color:var(--darker-bg);font-size:3rem;">{{ user.username|first|upper }}</span>
+                            <img id="profile-pic-preview" src="" alt="Profile Picture" class="d-none">
+                        {% endif %}
                         <div class="profile-picture-overlay">
                             <i class="bi bi-camera fs-3"></i>
                             <p class="mb-0 small">CHANGE</p>
@@ -236,9 +241,12 @@
                 </div>
 
                 <div class="mb-3">
-                    <label for="{{ form.about_me.id_for_label }}" class="form-label">
-                        <i class="bi bi-pencil-fill me-2"></i>About Me
-                    </label>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label for="{{ form.about_me.id_for_label }}" class="form-label mb-0">
+                            <i class="bi bi-pencil-fill me-2"></i>About Me
+                        </label>
+                        <small class="text-muted" id="about-me-counter" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">0 / 500</small>
+                    </div>
                     {{ form.about_me }}
                 </div>
 
@@ -248,6 +256,15 @@
                     </button>
                 </div>
             </form>
+
+            <hr class="my-4" style="border-color: var(--border-color);">
+            <div class="danger-zone p-3 rounded" style="background: rgba(255, 0, 110, 0.05); border: 1px solid rgba(255, 0, 110, 0.25);">
+                <h6 class="text-danger mb-2"><i class="bi bi-shield-lock me-2"></i>Session & Security</h6>
+                <p class="text-muted small mb-3">Logged in as <strong>{{ user.username }}</strong>. Member since {{ user.date_joined|date:"F Y" }}.</p>
+                <a href="{% url 'chatapp:logout' %}" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-box-arrow-right me-2"></i>Log Out
+                </a>
+            </div>
         </div>
     </div>
 </div>
@@ -258,25 +275,50 @@
     document.addEventListener('DOMContentLoaded', function() {
         const profilePicInput = document.getElementById('{{ form.profile_picture.id_for_label }}');
         const profilePicPreview = document.getElementById('profile-pic-preview');
+        const profilePicFallback = document.getElementById('profile-pic-fallback');
         const profileForm = document.getElementById('profile-form');
+        const aboutMeInput = document.getElementById('{{ form.about_me.id_for_label }}');
+        const counter = document.getElementById('about-me-counter');
 
-        // This function runs when a new file is chosen
-        profilePicInput.addEventListener('change', function(event) {
-            const file = event.target.files[0];
-            if (file) {
-                // Show a live preview of the new image
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    profilePicPreview.src = e.target.result;
+        // Character counter
+        if (aboutMeInput && counter) {
+            const updateCounter = () => {
+                const len = aboutMeInput.value.length;
+                counter.textContent = `${len} / 500`;
+                counter.style.color = len > 450 ? 'var(--warning-color)' : 'var(--text-secondary)';
+            };
+            aboutMeInput.addEventListener('input', updateCounter);
+            updateCounter();
+        }
+
+        // Live preview and submit on picture change
+        if (profilePicInput) {
+            profilePicInput.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        if (profilePicPreview) {
+                            profilePicPreview.src = e.target.result;
+                            profilePicPreview.classList.remove('d-none');
+                        }
+                        if (profilePicFallback) {
+                            profilePicFallback.classList.add('d-none');
+                        }
+                    };
+                    reader.readAsDataURL(file);
+
+                    const overlay = document.querySelector('.profile-picture-overlay');
+                    if (overlay) {
+                        overlay.innerHTML = '<div class="spinner-border text-light spinner-border-sm" role="status"></div><p class="mb-0 small mt-1">SAVING...</p>';
+                    }
+
+                    setTimeout(() => {
+                        profileForm.submit();
+                    }, 400);
                 }
-                reader.readAsDataURL(file);
-
-                // Automatically submit the form to save the change
-                setTimeout(() => {
-                    profileForm.submit();
-                }, 500); // Small delay to see the preview
-            }
-        });
+            });
+        }
     });
 </script>
 {% endblock %}

@@ -269,7 +269,14 @@
                         {% endif %}
                         {{ field.label }}
                     </label>
-                    {{ field }}
+                    <div class="position-relative">
+                        {{ field }}
+                        {% if 'password' in field.name %}
+                        <button type="button" class="btn password-toggle-btn position-absolute top-50 end-0 translate-middle-y me-2 text-muted" style="border:none;background:none;padding:0.25rem 0.5rem;z-index:5;" onclick="togglePassword(this)" title="Toggle password visibility">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        {% endif %}
+                    </div>
                     {% for error in field.errors %}
                         <div class="invalid-feedback">{{ error }}</div>
                     {% endfor %}
@@ -290,4 +297,20 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function togglePassword(btn) {
+        const input = btn.parentElement.querySelector('input');
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        } else {
+            input.type = 'password';
+            btn.innerHTML = '<i class="bi bi-eye"></i>';
+        }
+    }
+</script>
 {% endblock %}

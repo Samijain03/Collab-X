@@ -54,6 +54,11 @@
                 </div>
             </div>
             <textarea id="workspace-editor" placeholder="Pick a file from the list to start editing." disabled></textarea>
+            <div class="workspace-statusbar" id="workspace-statusbar">
+                <span><i class="bi bi-keyboard me-1"></i><kbd>auto-save</kbd></span>
+                <span id="workspace-status-lang">—</span>
+                <span class="ms-auto text-muted" id="workspace-status-cursor">Ln 1, Col 1</span>
+            </div>
             <div class="workspace-editor-controls">
                 <button class="btn btn-outline-light" id="workspace-download-btn" disabled>
                     <i class="bi bi-download me-1"></i>Download
